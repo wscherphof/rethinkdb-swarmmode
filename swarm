@@ -1,0 +1,11 @@
+#!/bin/bash
+set -x
+
+MANAGER_IP="$(docker-machine ip manager)"
+docker-machine ssh manager docker swarm init --advertise-addr $MANAGER_IP
+
+TOKEN="$(docker-machine ssh manager docker swarm join-token --quiet worker)"
+for i in {1..2}
+do
+	docker-machine ssh worker$i docker swarm join --token $TOKEN $MANAGER_IP:2377
+done
