@@ -4,6 +4,9 @@ set -x
 go fmt
 # cf. https://medium.com/@kelseyhightower/optimizing-docker-images-for-static-binaries-b5696e26eb07#.wmlq1nj3d
 CGO_ENABLED=0 GOOS=linux go build -a -tags netgo -ldflags '-w' .
+if [ ! "$?" = "0" ]; then
+	exit
+fi
 
 NAME="$(pwd | awk -F "/" '{print $NF}')" # Name of current subdirectory
 docker-machine ssh manager docker service rm $NAME
