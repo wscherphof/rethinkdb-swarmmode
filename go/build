@@ -12,7 +12,7 @@ echo "FROM scratch" > ./Dockerfile
 echo "MAINTAINER Wouter Scherphof <wouter.scherphof@gmail.com>" >> ./Dockerfile
 echo "ADD $NAME $NAME" >> ./Dockerfile
 echo "EXPOSE 9090" >> ./Dockerfile
-echo 'ENTRYPOINT ["/foo"]' >> ./Dockerfile
+echo "ENTRYPOINT [\"/"$NAME"\"]" >> ./Dockerfile
 
 if [ ! -f ./version ]; then
 	echo "0" > ./version
