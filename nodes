@@ -7,6 +7,6 @@ DOCKER_MACHINE_DRIVER="virtualbox  --virtualbox-memory 1024  --virtualbox-cpu-co
 for node in manager worker1 worker2
 do
 	docker-machine rm -f $node
-	docker-machine create --driver $DOCKER_MACHINE_DRIVER  $node
+	docker-machine create --driver $DOCKER_MACHINE_DRIVER $node
 	docker-machine restart $node
 done
