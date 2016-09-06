@@ -1,17 +1,17 @@
 #!/bin/bash
 set -x
 
-docker-machine ssh manager docker network create --driver overlay db
+docker-machine ssh manager docker network create --driver overlay dbnet
 sleep 5
 
-docker-machine ssh manager docker volume create --name dbone
-docker-machine ssh manager docker service rm dbone
-docker-machine ssh manager docker service create --name dbone  --replicas 1  --network db  --mount src=dbone,dst=/data --publish 8080:8080 rethinkdb
+docker-machine ssh manager docker volume create --name dbdata1
+docker-machine ssh manager docker service rm db1
+docker-machine ssh manager docker service create --name db1  --replicas 1  --network dbnet  --mount src=dbdata1,dst=/data --publish 8080:8080 rethinkdb
 sleep 5
 
-docker-machine ssh manager docker volume create --name db
+docker-machine ssh manager docker volume create --name dbdata
 docker-machine ssh manager docker service rm db
-docker-machine ssh manager docker service create --name db --mode global --network db  --mount src=db,dst=/data rethinkdb rethinkdb --join dbone:29015 --bind all
+docker-machine ssh manager docker service create --name db --mode global --network dbnet  --mount src=dbdata,dst=/data rethinkdb rethinkdb --join dbone:29015 --bind all
 sleep 5
 
 docker-machine ssh manager -fNL 8080:localhost:8080
