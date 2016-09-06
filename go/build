@@ -39,12 +39,13 @@ service ()
 
 if [ "$1" = "remote" ]; then
 	# Build on all nodes, using the VirtualBox machines' automatic /Users share, enabling to skip the push to the repository.
-	for node in manager worker1 worker2
+	NODES="manager worker1 worker2"
+	for node in $NODES
 	do
 		docker-machine ssh $node docker build -t wscherphof/$NAME:$NEW_VERSION $PWD
 	done
 	service
-	for node in manager worker1 worker2
+	for node in $NODES
 	do
 		docker-machine ssh $node docker rmi -f wscherphof/$NAME:$OLD_VERSION
 	done
