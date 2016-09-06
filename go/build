@@ -22,7 +22,7 @@ for node in manager worker1 worker2 # Either build on each node, or (build loal 
 do
 	docker-machine ssh $node docker build -t wscherphof/$NAME:$VERSION $PWD
 done
-docker-machine ssh manager docker service create --name $NAME --replicas 6 --network db --publish 9090:9090 wscherphof/$NAME:$VERSION
+docker-machine ssh manager docker service create --name $NAME --replicas 6 --network dbnet --publish 9090:9090 wscherphof/$NAME:$VERSION
 echo "$VERSION" > ./version
 rm ./$NAME ./Dockerfile
 sleep 5
