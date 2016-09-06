@@ -1,0 +1,31 @@
+#!/bin/bash
+set -x
+
+go fmt
+CGO_ENABLED=0 GOOS=linux go build -a -tags netgo -ldflags '-w' .
+
+if [ ! -f ./version ]; then
+	echo "0" > ./version
+fi
+VERSION="$(cat ./version)"
+NAME="$(pwd | awk -F "/" '{print $NF}')" # Name of current subdirectory
+docker-machine ssh manager docker service rm $NAME
+docker-machine ssh manager docker rmi -f wscherphof/$NAME:$VERSION
+
+echo "FROM scratch" > ./Dockerfile
+echo "MAINTAINER Wouter Scherphof <wouter.scherphof@gmail.com>" >> ./Dockerfile
+echo "ADD $NAME $NAME" >> ./Dockerfile
+echo "EXPOSE 9090" >> ./Dockerfile
+echo 'ENTRYPOINT ["/foo"]' >> ./Dockerfile
+VERSION="$(expr $VERSION + 1)"
+for node in manager worker1 worker2 # Either build on each node, or (build loal and) push to repository
+do
+	docker-machine ssh $node docker build -t wscherphof/$NAME:$VERSION $PWD
+done
+docker-machine ssh manager docker service create --name $NAME --replicas 6 --network db --publish 9090:9090 wscherphof/$NAME:$VERSION
+echo "$VERSION" > ./version
+rm ./$NAME ./Dockerfile
+sleep 5
+
+docker-machine ssh manager -fNL 9090:localhost:9090
+open http://localhost:9090
