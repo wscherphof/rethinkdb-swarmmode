@@ -37,19 +37,15 @@ service ()
 	fi
 }
 
+NODES="manager worker1 worker2"
 if [ "$1" = "remote" ]; then
 	# Build on all nodes, using the VirtualBox machines' automatic /Users share, enabling to skip the push to the repository.
 	# Dirty, but quick.
-	NODES="manager worker1 worker2"
 	for node in $NODES
 	do
 		docker-machine ssh $node docker build -t wscherphof/$NAME:$NEW_VERSION $PWD
 	done
 	service
-	for node in $NODES
-	do
-		docker-machine ssh $node docker rmi -f wscherphof/$NAME:$OLD_VERSION
-	done
 else
 	# Build locally and use the repository to make the new image available to the nodes.
 	# Prettier, but slower.
@@ -60,6 +56,10 @@ else
 	service
 fi
 rm ./$NAME ./Dockerfile
+for node in $NODES
+do
+	docker-machine ssh $node docker rmi -f wscherphof/$NAME:$OLD_VERSION
+done
 
 docker-machine ssh manager -fNL 9090:localhost:9090
 sleep 10
