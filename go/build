@@ -1,15 +1,19 @@
 #!/bin/bash
 set -x
 
+continue ()
+{
+	if [ ! "$?" = "0" ]; then
+		exit
+	fi
+}
+
 go fmt
 # cf. https://medium.com/@kelseyhightower/optimizing-docker-images-for-static-binaries-b5696e26eb07#.wmlq1nj3d
 CGO_ENABLED=0 GOOS=linux go build -a -tags netgo -ldflags '-w' .
-if [ ! "$?" = "0" ]; then
-	exit
-fi
+continue
 
 NAME="$(pwd | awk -F "/" '{print $NF}')" # Name of current subdirectory
-docker-machine ssh manager docker service rm $NAME
 
 echo "FROM scratch" > ./Dockerfile
 echo "MAINTAINER Wouter Scherphof <wouter.scherphof@gmail.com>" >> ./Dockerfile
@@ -24,12 +28,35 @@ OLD_VERSION="$(cat ./version)"
 NEW_VERSION="$(expr $OLD_VERSION + 1)"
 echo "$NEW_VERSION" > ./version
 
-for node in manager worker1 worker2 # Build image on each node. Alternatively, build locally once & push to a repository.
-do
-	docker-machine ssh $node docker rmi   -f wscherphof/$NAME:$OLD_VERSION
-	docker-machine ssh $node docker build -t wscherphof/$NAME:$NEW_VERSION $PWD
-done
-docker-machine ssh manager docker service create --name $NAME --replicas 6 --network dbnet --publish 9090:9090 wscherphof/$NAME:$NEW_VERSION
+service ()
+{
+	if [ "$(docker-machine ssh manager docker service ls | grep wscherphof/$NAME:)" = "" ]; then
+		docker-machine ssh manager docker service create --name $NAME --replicas 6 --network dbnet --publish 9090:9090 wscherphof/$NAME:$NEW_VERSION
+	else
+		docker-machine ssh manager docker service update --image wscherphof/$NAME:$NEW_VERSION $NAME
+	fi
+}
+
+if [ "$1" = "remote" ]; then
+	# Build on all nodes, using the VirtualBox machines' automatic /Users share, enabling to skip the push to the repository.
+	for node in manager worker1 worker2
+	do
+		docker-machine ssh $node docker build -t wscherphof/$NAME:$NEW_VERSION $PWD
+	done
+	service
+	for node in manager worker1 worker2
+	do
+		docker-machine ssh $node docker rmi -f wscherphof/$NAME:$OLD_VERSION
+	done
+else
+	# Build locally and use the repository to make the new image available to the nodes.
+	# Prettier, but slower.
+	docker rmi   -f wscherphof/$NAME:$OLD_VERSION
+	docker build -t wscherphof/$NAME:$NEW_VERSION .
+	docker push     wscherphof/$NAME:$NEW_VERSION
+	continue
+	service
+fi
 rm ./$NAME ./Dockerfile
 
 docker-machine ssh manager -fNL 9090:localhost:9090
