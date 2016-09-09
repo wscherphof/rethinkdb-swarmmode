@@ -4,7 +4,7 @@ set -x
 continue ()
 {
 	if [ ! "$?" = "0" ]; then
-		exit
+		exit $?
 	fi
 }
 
@@ -30,7 +30,8 @@ echo "$NEW_VERSION" > ./version
 
 service ()
 {
-	if [ "$(docker-machine ssh manager docker service ls | grep wscherphof/$NAME:)" = "" ]; then
+	docker-machine ssh manager docker service ps $NAME
+	if [ ! "$?" = "0" ]; then
 		docker-machine ssh manager docker service create --name $NAME --replicas 6 --network dbnet --publish 9090:9090 wscherphof/$NAME:$NEW_VERSION
 	else
 		docker-machine ssh manager docker service update --image wscherphof/$NAME:$NEW_VERSION $NAME
@@ -61,6 +62,6 @@ do
 	docker-machine ssh $node docker rmi -f wscherphof/$NAME:$OLD_VERSION
 done
 
-docker-machine ssh manager -fNL 9090:localhost:9090
 sleep 10
-open http://localhost:9090
+docker-machine ssh manager -fNL 9090:localhost:9090
+curl http://localhost:9090/bar

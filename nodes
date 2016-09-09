@@ -2,7 +2,7 @@
 set -x
 
 DOCKER_MACHINE_DRIVER="virtualbox --virtualbox-memory 1024 --virtualbox-cpu-count 2 --virtualbox-disk-size 10000"
-# DOCKER_MACHINE_DRIVER="digitalocean --digitalocean-access-token 7r86w34987tfg6w38975g6 --digitalocean-image ubuntu-16-04-x64"
+# DOCKER_MACHINE_DRIVER="digitalocean --digitalocean-access-token $DOTOKEN --digitalocean-image ubuntu-16-04-x64"
 
 machine ()
 {
