@@ -11,15 +11,16 @@ NUM=${2-1}
 rm ()
 {
 	echo "* removing ${!#}..."
-	eval $* 2>%1
+	eval $* 2>/dev/null
 }
 
 for i in $(seq 0 $NUM)
 do
 	rm docker-machine ssh ${ENV}-manager docker service rm db${i}
 done
+sleep 5
 rm docker-machine ssh ${ENV}-manager docker network rm dbnet
-
+sleep 5
 echo "* creating dbnet..."
 docker-machine ssh ${ENV}-manager docker network create --driver overlay dbnet
 
@@ -29,15 +30,11 @@ do
 	docker-machine ssh ${ENV}-manager docker volume create --name db${i}data
 	echo "* creating db${i}..."
 	if [ "$i" = "0" ]; then
-		MODE="--replicas 1"
-		PUBLISH="--publish 8080:8080"
-		CMD=""
+		docker-machine ssh ${ENV}-manager docker service create --name db${i} --replicas 1 --publish 8080:8080 --network dbnet --mount src=db${i}data,dst=/data rethinkdb
+		sleep 30
 	else
-		MODE="--mode global"
-		PUBLISH=""
-		CMD="rethinkdb --join db0:29015 --bind all"
+		docker-machine ssh ${ENV}-manager docker service create --name db${i} --mode global --network dbnet --mount src=db${i}data,dst=/data rethinkdb rethinkdb --join db0:29015 --bind all
 	fi
-	docker-machine ssh ${ENV}-manager docker service create --name db${i} ${MODE} ${PUBLISH} --network dbnet --mount src=db${i}data,dst=/data rethinkdb ${CMD}
 done
 
 echo "* connecting..."

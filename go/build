@@ -34,7 +34,7 @@ if [ "$ENV" = "dev" ]; then
 	# Build on all nodes, using the VirtualBox machines' automatic /Users share, enabling to skip the push to the repository.
 	# Dirty, but quick.
 	echo "* removing service..."
-	docker-machine ssh dev-manager docker service rm ${NAME} 2>%1
+	docker-machine ssh dev-manager docker service rm ${NAME} 2>/dev/null
 	for node in dev-manager dev-worker1 dev-worker2
 	do
 		echo "* building image on $node..."

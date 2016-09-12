@@ -9,7 +9,7 @@ if [ "$TAG" = "dev" ]; then
 fi
 
 echo "* starting service..."
-docker-machine ssh ${ENV}-manager docker service create --name ${NAME} --replicas 6 --network dbnet --publish 9090:9090 ${USER}/${NAME}:${TAG} 2>%1
+docker-machine ssh ${ENV}-manager docker service create --name ${NAME} --replicas 6 --network dbnet --publish 9090:9090 ${USER}/${NAME}:${TAG} 2>/dev/null
 if [ ! "$?" = "0" ]; then
 	docker-machine ssh ${ENV}-manager docker service update --image ${USER}/${NAME}:${TAG} ${NAME}
 fi
