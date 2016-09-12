@@ -1,5 +1,12 @@
 #!/bin/bash
-set -x
+
+USER="$1"
+NAME="$2"
+TAG="$3"
+ENV="$4"
+if [ "$TAG" = "dev" ]; then
+	ENV="dev"
+fi
 
 continue ()
 {
@@ -8,60 +15,38 @@ continue ()
 	fi
 }
 
+echo "* formatting source code..."
 go fmt
+echo "* compiling..."
 # cf. https://medium.com/@kelseyhightower/optimizing-docker-images-for-static-binaries-b5696e26eb07#.wmlq1nj3d
 CGO_ENABLED=0 GOOS=linux go build -a -tags netgo -ldflags '-w' .
 continue
 
-NAME="$(pwd | awk -F "/" '{print $NF}')" # Name of current subdirectory
+DIR="$(pwd | awk -F "/" '{print $NF}')" # Name of current subdirectory
 
 echo "FROM scratch" > ./Dockerfile
-echo "MAINTAINER Wouter Scherphof <wouter.scherphof@gmail.com>" >> ./Dockerfile
-echo "ADD $NAME $NAME" >> ./Dockerfile
+echo "ADD $DIR $DIR" >> ./Dockerfile
 echo "EXPOSE 9090" >> ./Dockerfile
-echo "ENTRYPOINT [\"/"$NAME"\"]" >> ./Dockerfile
+echo "ENTRYPOINT [\"/"${DIR}"\"]" >> ./Dockerfile
 
-if [ ! -f ./version ]; then
-	echo "0" > ./version
-fi
-OLD_VERSION="$(cat ./version)"
-NEW_VERSION="$(expr $OLD_VERSION + 1)"
-echo "$NEW_VERSION" > ./version
-
-service ()
-{
-	docker-machine ssh manager docker service ps $NAME
-	if [ ! "$?" = "0" ]; then
-		docker-machine ssh manager docker service create --name $NAME --replicas 6 --network dbnet --publish 9090:9090 wscherphof/$NAME:$NEW_VERSION
-	else
-		docker-machine ssh manager docker service update --image wscherphof/$NAME:$NEW_VERSION $NAME
-	fi
-}
-
-NODES="manager worker1 worker2"
-if [ "$1" = "remote" ]; then
+echo "* building image..."
+if [ "$ENV" = "dev" ]; then
 	# Build on all nodes, using the VirtualBox machines' automatic /Users share, enabling to skip the push to the repository.
 	# Dirty, but quick.
-	for node in $NODES
+	echo "* removing service..."
+	docker-machine ssh dev-manager docker service rm ${NAME} 2>%1
+	for node in dev-manager dev-worker1 dev-worker2
 	do
-		docker-machine ssh $node docker build -t wscherphof/$NAME:$NEW_VERSION $PWD
+		echo "* building image on $node..."
+		docker-machine ssh $node docker build -t ${USER}/${NAME}:${TAG} $PWD
 	done
-	service
 else
 	# Build locally and use the repository to make the new image available to the nodes.
 	# Prettier, but slower.
-	docker rmi   -f wscherphof/$NAME:$OLD_VERSION
-	docker build -t wscherphof/$NAME:$NEW_VERSION .
-	docker push     wscherphof/$NAME:$NEW_VERSION
+	docker build -t ${USER}/${NAME} .
+	echo "pushing image..."
+	docker push ${USER}/${NAME}
 	continue
-	service
 fi
-rm ./$NAME ./Dockerfile
-for node in $NODES
-do
-	docker-machine ssh $node docker rmi -f wscherphof/$NAME:$OLD_VERSION
-done
-
-sleep 10
-docker-machine ssh manager -fNL 9090:localhost:9090
-curl http://localhost:9090/bar
+rm ./$DIR ./Dockerfile
+echo "* done"
