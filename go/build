@@ -29,12 +29,9 @@ echo "ADD $DIR $DIR" >> ./Dockerfile
 echo "EXPOSE 9090" >> ./Dockerfile
 echo "ENTRYPOINT [\"/"${DIR}"\"]" >> ./Dockerfile
 
-echo "* building image..."
 if [ "$ENV" = "dev" ]; then
 	# Build on all nodes, using the VirtualBox machines' automatic /Users share, enabling to skip the push to the repository.
 	# Dirty, but quick.
-	echo "* removing service..."
-	docker-machine ssh dev-manager docker service rm ${NAME} 2>/dev/null
 	for node in dev-manager dev-worker1 dev-worker2
 	do
 		echo "* building image on $node..."
@@ -43,8 +40,9 @@ if [ "$ENV" = "dev" ]; then
 else
 	# Build locally and use the repository to make the new image available to the nodes.
 	# Prettier, but slower.
+	echo "* building image..."
 	docker build -t ${USER}/${NAME}:${TAG} .
-	echo "pushing image..."
+	echo "* pushing image..."
 	docker push ${USER}/${NAME}:${TAG}
 	continue
 fi
