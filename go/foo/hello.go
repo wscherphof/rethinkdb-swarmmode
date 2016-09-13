@@ -32,10 +32,8 @@ func main() {
 			log.Fatalln(err)
 		}
 
-		fmt.Fprintf(w, "Hello, %q", html.EscapeString(req.URL.Path))
-		fmt.Fprintf(w, "\n")
-		fmt.Fprintf(w, response)
-		fmt.Fprintf(w, "\n")
+		fmt.Fprintf(w, "Hello, %q 0.1\n", html.EscapeString(req.URL.Path))
+		fmt.Fprintf(w, response+"\n")
 	})
 
 	log.Fatal(http.ListenAndServe(":9090", nil))
