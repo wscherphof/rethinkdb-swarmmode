@@ -43,9 +43,9 @@ if [ "$ENV" = "dev" ]; then
 else
 	# Build locally and use the repository to make the new image available to the nodes.
 	# Prettier, but slower.
-	docker build -t ${USER}/${NAME} .
+	docker build -t ${USER}/${NAME}:${TAG} .
 	echo "pushing image..."
-	docker push ${USER}/${NAME}
+	docker push ${USER}/${NAME}:${TAG}
 	continue
 fi
 rm ./$DIR ./Dockerfile
