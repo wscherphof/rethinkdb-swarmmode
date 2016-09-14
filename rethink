@@ -30,10 +30,10 @@ do
 	docker-machine ssh ${ENV}-manager docker volume create --name db${i}data
 	echo "* creating db${i}..."
 	if [ "$i" = "0" ]; then
-		docker-machine ssh ${ENV}-manager docker service create --name db${i} --replicas 1 --publish 8080:8080 --network dbnet --mount src=db${i}data,dst=/data rethinkdb
+		docker-machine ssh ${ENV}-manager docker service create --name db0 --network dbnet --mount src=db0data,dst=/data --publish 8080:8080 rethinkdb
 		sleep 30
 	else
-		docker-machine ssh ${ENV}-manager docker service create --name db${i} --mode global --network dbnet --mount src=db${i}data,dst=/data rethinkdb rethinkdb --join db0:29015 --bind all
+		docker-machine ssh ${ENV}-manager docker service create --name db${i} --network dbnet --mount src=db${i}data,dst=/data --mode global rethinkdb rethinkdb --join db0 --bind all
 	fi
 done
 
