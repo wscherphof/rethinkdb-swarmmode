@@ -10,6 +10,12 @@ elif [[ "$2" = "create" ]]; then
 	NUM=${3-1}
 fi
 
+res=$(docker-machine ip ${ENV}-manager)
+if [ "$?" != "0" ]; then
+	echo -n "${res}"
+	exit 1
+fi
+
 portsdir="${HOME}/.rethinkdb_swarmmode/ports/"
 mkdir -p ${portsdir}
 if [ -e "${portsdir}${ENV}" ]; then
@@ -37,12 +43,6 @@ browse ()
 if [ ! "${NUM}" ]; then
 	browse
 	exit
-fi
-
-res=$(docker-machine ip ${ENV}-manager)
-if [ "$?" != "0" ]; then
-	echo -n "${res}"
-	exit 1
 fi
 
 remove ()
