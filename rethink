@@ -2,12 +2,48 @@
 
 ENV="$1"
 if [ "$ENV" = "" ]; then
-	echo "usage: rethink env [number of servers per node; default=1]"
+	echo "Usage:"
+	echo " $(basename $0) env"
+	echo " $(basename $0) env create [number of servers per node; default=1]"
 	exit 1
+elif [[ "$2" = "create" ]]; then
+	NUM=${3-1}
 fi
 
-NUM=${2-1}
+portsdir="${HOME}/.rethinkdb_swarmmode/ports/"
+mkdir -p ${portsdir}
+if [ -e "${portsdir}${ENV}" ]; then
+	PORT="$(cat ${portsdir}${ENV})"
+else
+	PORT="8080"
+	if [ -e "${portsdir}latest" ]; then
+		PORT="$(expr $(cat ${portsdir}latest) + 1)"
+	fi
+	echo "${PORT}" > "${portsdir}${ENV}"
+	echo "${PORT}" > "${portsdir}latest"
+fi
 
+browse ()
+{
+	url="http://localhost:${PORT}"
+	if [ "$(which xdg-open)" ]; then
+		xdg-open "${url}"
+	else
+		open "${url}"
+	fi
+	echo "${ENV}: ${url}"
+}
+
+if [ ! "${NUM}" ]; then
+	browse
+	exit
+fi
+
+res=$(docker-machine ip ${ENV}-manager)
+if [ "$?" != "0" ]; then
+	echo -n "${res}"
+	exit
+fi
 
 remove ()
 {
@@ -39,20 +75,7 @@ do
 done
 
 echo "* connecting..."
-sleep 30
-portsdir="${HOME}/.rethinkdb_swarmmode/ports/"
-mkdir -p ${portsdir}
-if [ -e "${portsdir}${ENV}" ]; then
-	port="$(cat ${portsdir}${ENV})"
-else
-	port="8080"
-	if [ -e "${portsdir}latest" ]; then
-		port="$(expr $(cat ${portsdir}latest) + 1)"
-	fi
-	echo "${port}" > "${portsdir}${ENV}"
-	echo "${port}" > "${portsdir}latest"
-fi
-docker-machine ssh ${ENV}-manager -fNL ${port}:localhost:8080
-echo "* opening http://localhost:${port}..."
-open http://localhost:${port}
+sleep 5
+docker-machine ssh ${ENV}-manager -fNL ${PORT}:localhost:8080
+browse
 echo "* done"
