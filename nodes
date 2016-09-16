@@ -2,25 +2,65 @@
 
 ENV="$1"
 if [ "$ENV" = "" ]; then
-	echo "usage: nodes env"
+	echo "Usage:"
+	echo "  nodes env [-do digitalocean-access-token] [node]"
+	echo "  nodes env rm [node]"
+	echo "e.g. nodes dev"
+	echo "  creates dev-manager, dev-worker1, and dev-worker2 on virtualbox"
+	echo "e.g. nodes dev rm worker2"
+	echo "  removes dev-worker2"
 	exit 1
 fi
-if [ "$2" = "-do" ]; then
-	DOTOKEN="$3"
-	DOCKER_MACHINE_DRIVER="digitalocean --digitalocean-access-token $DOTOKEN --digitalocean-image ubuntu-16-04-x64"
+if [ "$2" = "rm" ]; then
+	RM="rm"
+	NODE="$3"
+elif [ "$2" = "-do" ]; then
+	DO="$3"
+	NODE="$4"
+	DRIVER="digitalocean --digitalocean-access-token $DO --digitalocean-image ubuntu-16-04-x64"
 else
-	DOCKER_MACHINE_DRIVER="virtualbox --virtualbox-memory 1024 --virtualbox-cpu-count 2 --virtualbox-disk-size 10000"
+	NODE="$2"
+	DRIVER="virtualbox --virtualbox-memory 1024 --virtualbox-cpu-count 2 --virtualbox-disk-size 10000"
 fi
 
-machine ()
+if [ "$NODE" ]; then
+	NODES="${ENV}-${NODE}"
+else
+	NODES="${ENV}-manager ${ENV}-worker1 ${ENV}-worker2"
+fi
+
+create ()
 {
-	docker-machine rm -f $1
-	docker-machine create --driver $DOCKER_MACHINE_DRIVER $1
-	docker-machine restart $1
-	echo "* $1 done"
+	node="$1"
+	docker-machine create --driver $DRIVER $node
+	if [ "$?" != "0" ]; then
+		echo "* $node create failed"
+		return 1
+	elif [ "$DO" ]; then
+		docker-machine ssh $node ufw default deny incoming
+		docker-machine ssh $node ufw default allow outgoing
+		docker-machine ssh $node ufw allow ssh
+		docker-machine ssh $node ufw allow http
+		docker-machine ssh $node ufw allow https
+		docker-machine ssh $node ufw allow 2376 # docker api
+		docker-machine ssh $node ufw allow 2377 # docker swarm mode
+		docker-machine ssh $node ufw allow 7946 # docker overlay
+		docker-machine ssh $node ufw allow 4789 # ??
+		docker-machine ssh $node ufw --force enable
+	fi
+	docker-machine restart $node
+	if [ "$?" != "0" ]; then
+		echo "* $node restart failed"
+		return 1
+	else
+		echo "* $node ready"
+	fi
 }
 
-for node in ${ENV}-manager ${ENV}-worker1 ${ENV}-worker2
+for node in $NODES
 do
-	machine $node &
+	docker-machine rm -f $node
+	if [ ! "$RM" ]; then
+		create $node &
+	fi
 done
