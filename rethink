@@ -8,6 +8,7 @@ fi
 
 NUM=${2-1}
 
+
 remove ()
 {
 	echo "* removing ${!#}..."
@@ -18,9 +19,9 @@ for i in $(seq 0 $NUM)
 do
 	remove docker-machine ssh ${ENV}-manager docker service rm db${i}
 done
-sleep 5
+sleep 1
 remove docker-machine ssh ${ENV}-manager docker network rm dbnet
-sleep 5
+sleep 1
 echo "* creating dbnet..."
 docker-machine ssh ${ENV}-manager docker network create --driver overlay dbnet
 
@@ -39,6 +40,19 @@ done
 
 echo "* connecting..."
 sleep 30
-docker-machine ssh ${ENV}-manager -fNL 8080:localhost:8080
-open http://localhost:8080
+portsdir="${HOME}/.rethinkdb_swarmmode/ports/"
+mkdir -p ${portsdir}
+if [ -e "${portsdir}${ENV}" ]; then
+	port="$(cat ${portsdir}${ENV})"
+else
+	port="8080"
+	if [ -e "${portsdir}latest" ]; then
+		port="$(expr $(cat ${portsdir}latest) + 1)"
+	fi
+	echo "${port}" > "${portsdir}${ENV}"
+	echo "${port}" > "${portsdir}latest"
+fi
+docker-machine ssh ${ENV}-manager -fNL ${port}:localhost:8080
+echo "* opening http://localhost:${port}..."
+open http://localhost:${port}
 echo "* done"
