@@ -42,7 +42,7 @@ fi
 res=$(docker-machine ip ${ENV}-manager)
 if [ "$?" != "0" ]; then
 	echo -n "${res}"
-	exit
+	exit 1
 fi
 
 remove ()
