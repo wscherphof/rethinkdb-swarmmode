@@ -2,13 +2,13 @@
 
 ENV="$1"
 if [ "$ENV" = "" ]; then
-	echo "usage: rethink env (number of servers per node; default=1)"
+	echo "usage: rethink env [number of servers per node; default=1]"
 	exit 1
 fi
 
 NUM=${2-1}
 
-rm ()
+remove ()
 {
 	echo "* removing ${!#}..."
 	eval $* 2>/dev/null
@@ -16,10 +16,10 @@ rm ()
 
 for i in $(seq 0 $NUM)
 do
-	rm docker-machine ssh ${ENV}-manager docker service rm db${i}
+	remove docker-machine ssh ${ENV}-manager docker service rm db${i}
 done
 sleep 5
-rm docker-machine ssh ${ENV}-manager docker network rm dbnet
+remove docker-machine ssh ${ENV}-manager docker network rm dbnet
 sleep 5
 echo "* creating dbnet..."
 docker-machine ssh ${ENV}-manager docker network create --driver overlay dbnet
