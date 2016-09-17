@@ -24,10 +24,12 @@ continue
 
 DIR="$(pwd | awk -F "/" '{print $NF}')" # Name of current subdirectory
 
-echo "FROM scratch" > ./Dockerfile
-echo "ADD $DIR $DIR" >> ./Dockerfile
-echo "EXPOSE 9090" >> ./Dockerfile
-echo "ENTRYPOINT [\"/"${DIR}"\"]" >> ./Dockerfile
+cat >> ./Dockerfile <<EOF
+FROM scratch
+ADD ${DIR} ${DIR}
+EXPOSE 9090
+ENTRYPOINT ["/${DIR}"]
+EOF
 
 if [ "$ENV" = "dev" ]; then
 	# Build on all nodes, using the VirtualBox machines' automatic /Users share, enabling to skip the push to the repository.
