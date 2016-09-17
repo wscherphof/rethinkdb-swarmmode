@@ -1,42 +1,74 @@
 #!/bin/bash
 
 ENV="$1"
-if [ "$ENV" = "" ]; then
+if [ ! "$ENV" ]; then
 	echo "Usage:"
-	echo "  nodes env [-do digitalocean-access-token] [node]"
-	echo "  nodes env rm [node]"
+	echo "  nodes env [-do digitalocean-access-token] [type; manager or worker]"
+	echo "  nodes env rm"
 	echo "e.g. nodes dev"
-	echo "  creates dev-manager, dev-worker1, and dev-worker2 on virtualbox"
-	echo "e.g. nodes dev rm worker2"
-	echo "  removes dev-worker2"
+	echo "  creates dev-manager-1, dev-worker-1, and dev-worker-2 on virtualbox"
+	echo "e.g. nodes dev worker"
+	echo "  creates an extra worker node"
+	echo "e.g. nodes dev rm"
+	echo "  removes all dev nodes"
 	exit 1
 fi
+
+remove ()
+{
+	read -p "Type Y to remove ALL ${ENV} nodes... " answer
+	if [ "$answer" != "Y" ]; then
+		exit
+	fi
+	for type in worker manager
+	do
+		for (( i=1; ; i++ ))
+		do
+			docker-machine status ${ENV}-${type}-${i} &>/dev/null
+			if [ "$?" = "0" ]; then
+				docker-machine rm -f ${ENV}-${type}-${i}
+			else
+				break
+			fi
+		done
+	done
+}
+
 if [ "$2" = "rm" ]; then
-	RM="rm"
-	NODE="$3"
+	remove
+	exit
 elif [ "$2" = "-do" ]; then
 	DO="$3"
-	NODE="$4"
+	TYPE="$4"
 	DRIVER="digitalocean --digitalocean-access-token $DO --digitalocean-image ubuntu-16-04-x64"
 else
-	NODE="$2"
+	TYPE="$2"
 	DRIVER="virtualbox --virtualbox-memory 1024 --virtualbox-cpu-count 2 --virtualbox-disk-size 10000"
-fi
-
-if [ "$NODE" ]; then
-	NODES="${ENV}-${NODE}"
-else
-	NODES="${ENV}-manager ${ENV}-worker1 ${ENV}-worker2"
 fi
 
 create ()
 {
-	node="$1"
+	type="$1"
+	number="$2"
+	node="${ENV}-${type}-${number}"
 	docker-machine create --driver $DRIVER $node
 	if [ "$?" != "0" ]; then
 		echo "* $node create failed"
 		return 1
-	elif [ "$DO" ]; then
+	fi
+	MANAGER_IP="$(docker-machine ip ${ENV}-manager-1)"
+	if [ "$type" = "manager" ]; then
+		if [ "$number" = "1" ]; then
+			docker-machine ssh ${ENV}-manager-1 docker swarm init --advertise-addr $MANAGER_IP
+		else	
+			TOKEN="$(docker-machine ssh ${ENV}-manager-1 docker swarm join-token --quiet manager)"
+			docker-machine ssh ${ENV}-manager-$number docker swarm join --token $TOKEN $MANAGER_IP:2377
+		fi
+	else
+		TOKEN="$(docker-machine ssh ${ENV}-manager-1 docker swarm join-token --quiet worker)"
+		docker-machine ssh ${ENV}-worker-$number docker swarm join --token $TOKEN $MANAGER_IP:2377
+	fi
+	if [ "$DO" ]; then
 		docker-machine ssh $node ufw default deny incoming
 		docker-machine ssh $node ufw default allow outgoing
 		docker-machine ssh $node ufw allow ssh
@@ -57,10 +89,19 @@ create ()
 	fi
 }
 
-for node in $NODES
-do
-	docker-machine rm -f $node
-	if [ ! "$RM" ]; then
-		create $node &
-	fi
-done
+if [ "$TYPE" ]; then
+	for (( i=1; ; i++ ))
+	do
+		docker-machine status ${ENV}-${TYPE}-${i} &>/dev/null
+		if [ "$?" != "0" ]; then
+			NUMBER="$i"
+			break
+		fi
+	done
+	create $TYPE $NUMBER
+else
+	remove
+	create manager 1
+	create worker 1 &
+	create worker 2
+fi

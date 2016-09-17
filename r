@@ -10,7 +10,7 @@ elif [[ "$2" = "create" ]]; then
 	NUM=${3-1}
 fi
 
-res=$(docker-machine ip ${ENV}-manager)
+res=$(docker-machine ip ${ENV}-manager-1)
 if [ "$?" != "0" ]; then
 	echo -n "${res}"
 	exit 1
@@ -53,29 +53,29 @@ remove ()
 
 for i in $(seq 0 $NUM)
 do
-	remove docker-machine ssh ${ENV}-manager docker service rm db${i}
+	remove docker-machine ssh ${ENV}-manager-1 docker service rm db${i}
 done
 sleep 1
-remove docker-machine ssh ${ENV}-manager docker network rm dbnet
+remove docker-machine ssh ${ENV}-manager-1 docker network rm dbnet
 sleep 1
 echo "* creating dbnet..."
-docker-machine ssh ${ENV}-manager docker network create --driver overlay dbnet
+docker-machine ssh ${ENV}-manager-1 docker network create --driver overlay dbnet
 
 for i in $(seq 0 $NUM)
 do
 	echo "* creating db${i}data..."
-	docker-machine ssh ${ENV}-manager docker volume create --name db${i}data
+	docker-machine ssh ${ENV}-manager-1 docker volume create --name db${i}data
 	echo "* creating db${i}..."
 	if [ "$i" = "0" ]; then
-		docker-machine ssh ${ENV}-manager docker service create --name db0 --network dbnet --mount src=db0data,dst=/data --publish 8080:8080 rethinkdb
+		docker-machine ssh ${ENV}-manager-1 docker service create --name db0 --network dbnet --mount src=db0data,dst=/data --publish 8080:8080 rethinkdb
 		sleep 30
 	else
-		docker-machine ssh ${ENV}-manager docker service create --name db${i} --network dbnet --mount src=db${i}data,dst=/data --mode global rethinkdb rethinkdb --join db0 --bind all
+		docker-machine ssh ${ENV}-manager-1 docker service create --name db${i} --network dbnet --mount src=db${i}data,dst=/data --mode global rethinkdb rethinkdb --join db0 --bind all
 	fi
 done
 
 echo "* connecting..."
 sleep 5
-docker-machine ssh ${ENV}-manager -fNL ${PORT}:localhost:8080
+docker-machine ssh ${ENV}-manager-1 -fNL ${PORT}:localhost:8080
 browse
 echo "* done"

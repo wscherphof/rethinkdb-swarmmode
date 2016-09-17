@@ -4,9 +4,6 @@ USER="$1"
 NAME="$2"
 TAG="$3"
 ENV="$4"
-if [ "$TAG" = "dev" ]; then
-	ENV="dev"
-fi
 
 continue ()
 {
@@ -34,10 +31,19 @@ EOF
 if [ "$ENV" = "dev" ]; then
 	# Build on all nodes, using the VirtualBox machines' automatic /Users share, enabling to skip the push to the repository.
 	# Dirty, but quick.
-	for node in dev-manager dev-worker1 dev-worker2
+	for type in worker manager
 	do
-		echo "* building image on $node..."
-		docker-machine ssh $node docker build -t ${USER}/${NAME}:${TAG} $PWD
+		for (( i=1; ; i++ ))
+		do
+			node="${ENV}-${type}-${i}"
+			docker-machine status $node &>/dev/null
+			if [ "$?" = "0" ]; then
+				echo "* building image on $node..."
+				docker-machine ssh $node docker build -t ${USER}/${NAME}:${TAG} $PWD
+			else
+				break
+			fi
+		done
 	done
 else
 	# Build locally and use the repository to make the new image available to the nodes.
