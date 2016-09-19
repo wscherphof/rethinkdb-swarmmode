@@ -31,6 +31,8 @@ fi
 
 browse ()
 {
+	docker-machine ssh ${ENV}-manager-1 -fNL ${PORT}:localhost:8080
+	sleep 1
 	url="http://localhost:${PORT}"
 	if [ "$(which xdg-open)" ]; then
 		xdg-open "${url}"
@@ -68,14 +70,12 @@ do
 	echo "* creating db${i}..."
 	if [ "$i" = "0" ]; then
 		docker-machine ssh ${ENV}-manager-1 sudo docker service create --name db0 --network dbnet --mount src=db0data,dst=/data --publish 8080:8080 rethinkdb
-		sleep 30
+		sleep 10
 	else
 		docker-machine ssh ${ENV}-manager-1 sudo docker service create --name db${i} --network dbnet --mount src=db${i}data,dst=/data --mode global rethinkdb rethinkdb --join db0 --bind all
 	fi
 done
 
 echo "* connecting..."
-sleep 5
-docker-machine ssh ${ENV}-manager-1 -fNL ${PORT}:localhost:8080
 browse
 echo "* done"

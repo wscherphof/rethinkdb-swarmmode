@@ -1,9 +1,26 @@
 #!/bin/bash
 
+cat >> ./firewall << EOF
+	sudo ufw default deny incoming
+	sudo ufw default allow outgoing
+	sudo ufw allow ssh
+	sudo ufw allow http
+	sudo ufw allow https
+	sudo ufw allow ntp
+	sudo ufw allow bootpc
+	sudo ufw allow bootps
+	sudo ufw allow 2376 # docker api
+	sudo ufw allow 2377 # docker swarm mode
+	sudo ufw allow 7946 # docker overlay network
+	sudo ufw --force enable
+EOF
+
 usage ()
 {
 	echo "Usage:"
 	echo "  nodes env [-d driver] [type; manager or worker]"
+	echo "  nodes env stop"
+	echo "  nodes env start"
 	echo "  nodes env rm"
 	echo "e.g. nodes dev"
 	echo "  creates dev-manager-1, dev-worker-1, and dev-worker-2 on virtualbox"
@@ -15,25 +32,33 @@ usage ()
 	echo "e.g. nodes tst -d google worker"
 	echo "  creates an extra worker (tst-worker-3) on google compute engine"
 	echo "  use environment values to specify mandatory and optional settings"
+	echo "e.g. nodes dev stop"
+	echo "  stops all dev nodes"
+	echo "e.g. nodes dev start"
+	echo "  starts all dev nodes"
 	echo "e.g. nodes dev rm"
 	echo "  removes all dev nodes"
 	exit 1
 }
 
-if [ ! "$1" -o "$1" = "help" -o "$1" = "-h" -o "$1" = "--help" ]; then
+if [ "$1" = "" -o "$1" = "help" -o "$1" = "-h" -o "$1" = "--help" ]; then
 	usage
 else
 	ENV="$1"
 fi
-if [ "$2" = "rm" ]; then
+if [ "$2" = "stop" ]; then
+	STOP="stop"
+elif [ "$2" = "start" ]; then
+	START="start"
+elif [ "$2" = "rm" ]; then
 	RM="rm"
 elif [ "$2" = "-d" -o "$2" = "--driver" ]; then
 	DRIVER="$3"
 	TYPE="$4"
 	FIREWALL="y"
-elif [ "$2" = "manager" -o "$2" = "worker" ]; then
+elif [ "$2" = "" -o "$2" = "manager" -o "$2" = "worker" ]; then
 	TYPE="$2"
-	DRIVER="virtualbox --virtualbox-memory 1024 --virtualbox-cpu-count 2 --virtualbox-disk-size 10000"
+	DRIVER="virtualbox"
 else
 	usage
 fi
@@ -61,16 +86,9 @@ create ()
 		docker-machine ssh ${ENV}-worker-$number sudo docker swarm join --token $TOKEN $MANAGER_IP:2377
 	fi
 	if [ "$FIREWALL" ]; then
-		docker-machine ssh $node sudo ufw default deny incoming
-		docker-machine ssh $node sudo ufw default allow outgoing
-		docker-machine ssh $node sudo ufw allow ssh
-		docker-machine ssh $node sudo ufw allow http
-		docker-machine ssh $node sudo ufw allow https
-		docker-machine ssh $node sudo ufw allow 2376 # docker api
-		docker-machine ssh $node sudo ufw allow 2377 # docker swarm mode
-		docker-machine ssh $node sudo ufw allow 7946 # docker overlay
-		docker-machine ssh $node sudo ufw allow 4789 # ??
-		docker-machine ssh $node sudo ufw --force enable
+		dir="$(docker-machine ssh $node pwd)"
+		docker-machine scp ./firewall ${node}:${dir}
+		docker-machine ssh $node . ${dir}/firewall
 	fi
 	docker-machine restart $node
 	if [ "$?" != "0" ]; then
@@ -81,19 +99,16 @@ create ()
 	fi
 }
 
-remove ()
+loop ()
 {
-	read -p "Type Y to remove ALL ${ENV} nodes... " answer
-	if [ "$answer" != "Y" ]; then
-		exit
-	fi
+	command="$1"
 	for type in worker manager
 	do
 		for (( i=1; ; i++ ))
 		do
 			docker-machine status ${ENV}-${type}-${i} &>/dev/null
 			if [ "$?" = "0" ]; then
-				docker-machine rm -f ${ENV}-${type}-${i}
+				docker-machine $command ${ENV}-${type}-${i}
 			else
 				break
 			fi
@@ -101,12 +116,25 @@ remove ()
 	done
 }
 
-if [ "$RM" ]; then
+remove ()
+{
+	read -p "Type Y to remove ALL ${ENV} nodes... " answer
+	if [ "$answer" != "Y" ]; then
+		return
+	fi
+	loop "rm -f"
+}
+
+if [ "$STOP" ]; then
+	loop "stop"
+elif [ "$START" ]; then
+	loop "start"
+elif [ "$RM" ]; then
 	remove
 elif [ "$TYPE" ]; then
 	for (( i=1; ; i++ ))
 	do
-		docker-machine ip ${ENV}-${TYPE}-${i} &>/dev/null
+		docker-machine status ${ENV}-${TYPE}-${i} &>/dev/null
 		if [ "$?" != "0" ]; then
 			NUMBER="$i"
 			break
@@ -119,3 +147,5 @@ else
 	create worker 1 &
 	create worker 2
 fi
+
+rm ./firewall
