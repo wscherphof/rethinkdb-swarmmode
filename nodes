@@ -27,7 +27,7 @@ else
 fi
 if [ "$2" = "rm" ]; then
 	RM="rm"
-elif [ "$2" = "-d" ]; then
+elif [ "$2" = "-d" -o "$2" = "--driver" ]; then
 	DRIVER="$3"
 	TYPE="$4"
 	FIREWALL="y"
@@ -51,14 +51,14 @@ create ()
 	MANAGER_IP="$(docker-machine ip ${ENV}-manager-1)"
 	if [ "$type" = "manager" ]; then
 		if [ "$number" = "1" ]; then
-			docker-machine ssh ${ENV}-manager-1 docker swarm init --advertise-addr $MANAGER_IP
+			docker-machine ssh ${ENV}-manager-1 sudo docker swarm init --advertise-addr $MANAGER_IP
 		else	
-			TOKEN="$(docker-machine ssh ${ENV}-manager-1 docker swarm join-token --quiet manager)"
-			docker-machine ssh ${ENV}-manager-$number docker swarm join --token $TOKEN $MANAGER_IP:2377
+			TOKEN="$(docker-machine ssh ${ENV}-manager-1 sudo docker swarm join-token --quiet manager)"
+			docker-machine ssh ${ENV}-manager-$number sudo docker swarm join --token $TOKEN $MANAGER_IP:2377
 		fi
 	else
-		TOKEN="$(docker-machine ssh ${ENV}-manager-1 docker swarm join-token --quiet worker)"
-		docker-machine ssh ${ENV}-worker-$number docker swarm join --token $TOKEN $MANAGER_IP:2377
+		TOKEN="$(docker-machine ssh ${ENV}-manager-1 sudo docker swarm join-token --quiet worker)"
+		docker-machine ssh ${ENV}-worker-$number sudo docker swarm join --token $TOKEN $MANAGER_IP:2377
 	fi
 	if [ "$FIREWALL" ]; then
 		docker-machine ssh $node sudo ufw default deny incoming
