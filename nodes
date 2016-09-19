@@ -1,49 +1,41 @@
 #!/bin/bash
 
-ENV="$1"
-if [ ! "$ENV" ]; then
+usage ()
+{
 	echo "Usage:"
-	echo "  nodes env [-do digitalocean-access-token] [type; manager or worker]"
+	echo "  nodes env [-d driver] [type; manager or worker]"
 	echo "  nodes env rm"
 	echo "e.g. nodes dev"
 	echo "  creates dev-manager-1, dev-worker-1, and dev-worker-2 on virtualbox"
 	echo "e.g. nodes dev worker"
-	echo "  creates an extra worker node"
+	echo "  creates an extra worker (dev-worker-3) on virtualbox"
+	echo "e.g. nodes tst -d digitalocean"
+	echo "  creates tst-manager-1, tst-worker-1, and tst-worker-2 on digitalocean"
+	echo "  use environment values to specify mandatory and optional settings"
+	echo "e.g. nodes tst -d google worker"
+	echo "  creates an extra worker (tst-worker-3) on google compute engine"
+	echo "  use environment values to specify mandatory and optional settings"
 	echo "e.g. nodes dev rm"
 	echo "  removes all dev nodes"
 	exit 1
-fi
-
-remove ()
-{
-	read -p "Type Y to remove ALL ${ENV} nodes... " answer
-	if [ "$answer" != "Y" ]; then
-		exit
-	fi
-	for type in worker manager
-	do
-		for (( i=1; ; i++ ))
-		do
-			docker-machine status ${ENV}-${type}-${i} &>/dev/null
-			if [ "$?" = "0" ]; then
-				docker-machine rm -f ${ENV}-${type}-${i}
-			else
-				break
-			fi
-		done
-	done
 }
 
-if [ "$2" = "rm" ]; then
-	remove
-	exit
-elif [ "$2" = "-do" ]; then
-	DO="$3"
-	TYPE="$4"
-	DRIVER="digitalocean --digitalocean-access-token $DO --digitalocean-image ubuntu-16-04-x64"
+if [ ! "$1" -o "$1" = "help" -o "$1" = "-h" -o "$1" = "--help" ]; then
+	usage
 else
+	ENV="$1"
+fi
+if [ "$2" = "rm" ]; then
+	RM="rm"
+elif [ "$2" = "-d" ]; then
+	DRIVER="$3"
+	TYPE="$4"
+	FIREWALL="y"
+elif [ "$2" = "manager" -o "$2" = "worker" ]; then
 	TYPE="$2"
 	DRIVER="virtualbox --virtualbox-memory 1024 --virtualbox-cpu-count 2 --virtualbox-disk-size 10000"
+else
+	usage
 fi
 
 create ()
@@ -68,17 +60,17 @@ create ()
 		TOKEN="$(docker-machine ssh ${ENV}-manager-1 docker swarm join-token --quiet worker)"
 		docker-machine ssh ${ENV}-worker-$number docker swarm join --token $TOKEN $MANAGER_IP:2377
 	fi
-	if [ "$DO" ]; then
-		docker-machine ssh $node ufw default deny incoming
-		docker-machine ssh $node ufw default allow outgoing
-		docker-machine ssh $node ufw allow ssh
-		docker-machine ssh $node ufw allow http
-		docker-machine ssh $node ufw allow https
-		docker-machine ssh $node ufw allow 2376 # docker api
-		docker-machine ssh $node ufw allow 2377 # docker swarm mode
-		docker-machine ssh $node ufw allow 7946 # docker overlay
-		docker-machine ssh $node ufw allow 4789 # ??
-		docker-machine ssh $node ufw --force enable
+	if [ "$FIREWALL" ]; then
+		docker-machine ssh $node sudo ufw default deny incoming
+		docker-machine ssh $node sudo ufw default allow outgoing
+		docker-machine ssh $node sudo ufw allow ssh
+		docker-machine ssh $node sudo ufw allow http
+		docker-machine ssh $node sudo ufw allow https
+		docker-machine ssh $node sudo ufw allow 2376 # docker api
+		docker-machine ssh $node sudo ufw allow 2377 # docker swarm mode
+		docker-machine ssh $node sudo ufw allow 7946 # docker overlay
+		docker-machine ssh $node sudo ufw allow 4789 # ??
+		docker-machine ssh $node sudo ufw --force enable
 	fi
 	docker-machine restart $node
 	if [ "$?" != "0" ]; then
@@ -89,10 +81,32 @@ create ()
 	fi
 }
 
-if [ "$TYPE" ]; then
+remove ()
+{
+	read -p "Type Y to remove ALL ${ENV} nodes... " answer
+	if [ "$answer" != "Y" ]; then
+		exit
+	fi
+	for type in worker manager
+	do
+		for (( i=1; ; i++ ))
+		do
+			docker-machine status ${ENV}-${type}-${i} &>/dev/null
+			if [ "$?" = "0" ]; then
+				docker-machine rm -f ${ENV}-${type}-${i}
+			else
+				break
+			fi
+		done
+	done
+}
+
+if [ "$RM" ]; then
+	remove
+elif [ "$TYPE" ]; then
 	for (( i=1; ; i++ ))
 	do
-		docker-machine status ${ENV}-${TYPE}-${i} &>/dev/null
+		docker-machine ip ${ENV}-${TYPE}-${i} &>/dev/null
 		if [ "$?" != "0" ]; then
 			NUMBER="$i"
 			break

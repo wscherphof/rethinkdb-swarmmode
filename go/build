@@ -3,21 +3,16 @@
 USER="$1"
 NAME="$2"
 TAG="$3"
-ENV="$4"
-
-continue ()
-{
-	if [ ! "$?" = "0" ]; then
-		exit $?
-	fi
-}
+ENV="${4=dev}"
 
 echo "* formatting source code..."
 go fmt
 echo "* compiling..."
 # cf. https://medium.com/@kelseyhightower/optimizing-docker-images-for-static-binaries-b5696e26eb07#.wmlq1nj3d
 CGO_ENABLED=0 GOOS=linux go build -a -tags netgo -ldflags '-w' .
-continue
+if [ "$?" != "0" ]; then
+	exit $?
+fi
 
 DIR="$(pwd | awk -F "/" '{print $NF}')" # Name of current subdirectory
 
@@ -36,7 +31,7 @@ if [ "$ENV" = "dev" ]; then
 		for (( i=1; ; i++ ))
 		do
 			node="${ENV}-${type}-${i}"
-			docker-machine status $node &>/dev/null
+			docker-machine ip $node &>/dev/null
 			if [ "$?" = "0" ]; then
 				echo "* building image on $node..."
 				docker-machine ssh $node docker build -t ${USER}/${NAME}:${TAG} $PWD
@@ -52,7 +47,6 @@ else
 	docker build -t ${USER}/${NAME}:${TAG} .
 	echo "* pushing image..."
 	docker push ${USER}/${NAME}:${TAG}
-	continue
 fi
 rm ./$DIR ./Dockerfile
 echo "* done"
