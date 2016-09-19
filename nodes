@@ -1,20 +1,5 @@
 #!/bin/bash
 
-cat >> ./firewall << EOF
-	sudo ufw default deny incoming
-	sudo ufw default allow outgoing
-	sudo ufw allow ssh
-	sudo ufw allow http
-	sudo ufw allow https
-	sudo ufw allow ntp
-	sudo ufw allow bootpc
-	sudo ufw allow bootps
-	sudo ufw allow 2376 # docker api
-	sudo ufw allow 2377 # docker swarm mode
-	sudo ufw allow 7946 # docker overlay network
-	sudo ufw --force enable
-EOF
-
 usage ()
 {
 	echo "Usage:"
@@ -46,12 +31,42 @@ if [ "$1" = "" -o "$1" = "help" -o "$1" = "-h" -o "$1" = "--help" ]; then
 else
 	ENV="$1"
 fi
+
+loop ()
+{
+	command="$1"
+	for type in worker manager
+	do
+		for (( i=1; ; i++ ))
+		do
+			docker-machine status ${ENV}-${type}-${i} &>/dev/null
+			if [ "$?" = "0" ]; then
+				docker-machine $command ${ENV}-${type}-${i}
+			else
+				break
+			fi
+		done
+	done
+}
+
+remove ()
+{
+	read -p "Type Y to remove ALL ${ENV} nodes... " answer
+	if [ "$answer" != "Y" ]; then
+		return
+	fi
+	loop "rm -f"
+}
+
 if [ "$2" = "stop" ]; then
-	STOP="stop"
+	loop "stop"
+	exit 0
 elif [ "$2" = "start" ]; then
-	START="start"
+	loop "start"
+	exit 0
 elif [ "$2" = "rm" ]; then
-	RM="rm"
+	remove
+	exit 0
 elif [ "$2" = "-d" -o "$2" = "--driver" ]; then
 	DRIVER="$3"
 	TYPE="$4"
@@ -99,39 +114,22 @@ create ()
 	fi
 }
 
-loop ()
-{
-	command="$1"
-	for type in worker manager
-	do
-		for (( i=1; ; i++ ))
-		do
-			docker-machine status ${ENV}-${type}-${i} &>/dev/null
-			if [ "$?" = "0" ]; then
-				docker-machine $command ${ENV}-${type}-${i}
-			else
-				break
-			fi
-		done
-	done
-}
+cat >> ./firewall << EOF
+	sudo ufw default deny incoming
+	sudo ufw default allow outgoing
+	sudo ufw allow ssh
+	sudo ufw allow http
+	sudo ufw allow https
+	sudo ufw allow ntp
+	sudo ufw allow bootpc
+	sudo ufw allow bootps
+	sudo ufw allow 2376 # docker api
+	sudo ufw allow 2377 # docker swarm mode
+	sudo ufw allow 7946 # docker overlay network
+	sudo ufw --force enable
+EOF
 
-remove ()
-{
-	read -p "Type Y to remove ALL ${ENV} nodes... " answer
-	if [ "$answer" != "Y" ]; then
-		return
-	fi
-	loop "rm -f"
-}
-
-if [ "$STOP" ]; then
-	loop "stop"
-elif [ "$START" ]; then
-	loop "start"
-elif [ "$RM" ]; then
-	remove
-elif [ "$TYPE" ]; then
+if [ "$TYPE" ]; then
 	for (( i=1; ; i++ ))
 	do
 		docker-machine status ${ENV}-${TYPE}-${i} &>/dev/null
