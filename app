@@ -6,9 +6,9 @@ NAME="$3"
 TAG="$4"
 PORT="$5"
 REPLICAS="${6-1}"
-BROWSER="$7"
+BROWSEPATH="$7"
 PROTOCOL="$8"
-BROWSEPATH="$9"
+BROWSER="$9"
 
 echo "* starting service..."
 docker-machine ssh tst-manager-1 sudo docker service ps $NAME &>/dev/null
@@ -20,4 +20,4 @@ fi
 
 echo "* connecting..."
 sleep 15
-$(dirname "$0")/tunnel $ENV $PORT $BROWSER $PROTOCOL $BROWSEPATH
+$(dirname "$0")/tunnel $ENV $PORT $BROWSEPATH $PROTOCOL $BROWSER

@@ -17,7 +17,7 @@ if [ "$?" != "0" ]; then
 fi
 
 if [ ! "${NUM}" ]; then
-	$(dirname "$0")/tunnel $ENV 8080 open
+	$(dirname "$0")/tunnel $ENV 8080 /
 	exit
 fi
 
@@ -52,4 +52,4 @@ done
 
 echo "* connecting..."
 sleep 15
-$(dirname "$0")/tunnel $ENV 8080 open
+$(dirname "$0")/tunnel $ENV 8080 /
