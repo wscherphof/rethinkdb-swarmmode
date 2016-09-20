@@ -2,27 +2,39 @@
 
 usage ()
 {
+	echo
+	echo "$(basename $0) creates one or more Docker machines (nodes),"
+	echo "and adds them to a specific swarm (a named 'environment')"
+	echo
 	echo "Usage:"
-	echo "  nodes env [-d driver] [type; manager or worker]"
-	echo "  nodes env stop"
-	echo "  nodes env start"
-	echo "  nodes env rm"
-	echo "e.g. nodes dev"
+	echo "  $(basename $0) env [-d driver] [type; manager or worker]"
+	echo "  $(basename $0) env stop"
+	echo "  $(basename $0) env start"
+	echo "  $(basename $0) env rm"
+	echo
+	echo "e.g. $(basename $0) dev"
 	echo "  creates dev-manager-1, dev-worker-1, and dev-worker-2 on virtualbox"
-	echo "e.g. nodes dev worker"
+	echo
+	echo "e.g. $(basename $0) dev worker"
 	echo "  creates an extra worker (dev-worker-3) on virtualbox"
-	echo "e.g. nodes tst -d digitalocean"
+	echo
+	echo "e.g. $(basename $0) tst -d digitalocean"
 	echo "  creates tst-manager-1, tst-worker-1, and tst-worker-2 on digitalocean"
 	echo "  use environment values to specify mandatory and optional settings"
-	echo "e.g. nodes tst -d google worker"
+	echo
+	echo "e.g. $(basename $0) tst -d google worker"
 	echo "  creates an extra worker (tst-worker-3) on google compute engine"
 	echo "  use environment values to specify mandatory and optional settings"
-	echo "e.g. nodes dev stop"
+	echo
+	echo "e.g. $(basename $0) dev stop"
 	echo "  stops all dev nodes"
-	echo "e.g. nodes dev start"
+	echo
+	echo "e.g. $(basename $0) dev start"
 	echo "  starts all dev nodes"
-	echo "e.g. nodes dev rm"
+	echo
+	echo "e.g. $(basename $0) dev rm"
 	echo "  removes all dev nodes"
+	echo
 	exit 1
 }
 
