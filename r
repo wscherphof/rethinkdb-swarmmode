@@ -16,34 +16,8 @@ if [ "$?" != "0" ]; then
 	exit 1
 fi
 
-portsdir="${HOME}/.rethinkdb_swarmmode/ports/"
-mkdir -p ${portsdir}
-if [ -e "${portsdir}${ENV}" ]; then
-	PORT="$(cat ${portsdir}${ENV})"
-else
-	PORT="8080"
-	if [ -e "${portsdir}latest" ]; then
-		PORT="$(expr $(cat ${portsdir}latest) + 1)"
-	fi
-	echo "${PORT}" > "${portsdir}${ENV}"
-	echo "${PORT}" > "${portsdir}latest"
-fi
-
-browse ()
-{
-	docker-machine ssh ${ENV}-manager-1 -fNL ${PORT}:localhost:8080
-	sleep 1
-	url="http://localhost:${PORT}"
-	if [ "$(which xdg-open)" ]; then
-		xdg-open "${url}"
-	else
-		open "${url}"
-	fi
-	echo "${ENV}: ${url}"
-}
-
 if [ ! "${NUM}" ]; then
-	browse
+	$(dirname "$0")/tunnel $ENV 8080 open
 	exit
 fi
 
@@ -77,5 +51,5 @@ do
 done
 
 echo "* connecting..."
-browse
-echo "* done"
+sleep 15
+$(dirname "$0")/tunnel $ENV 8080 open

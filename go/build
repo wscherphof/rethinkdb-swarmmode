@@ -1,9 +1,9 @@
 #!/bin/bash
 
-USER="$1"
-NAME="$2"
-TAG="$3"
-ENV="${4=dev}"
+ENV="$1"
+USER="$2"
+NAME="$3"
+TAG="$4"
 
 echo "* formatting source code..."
 go fmt
@@ -34,7 +34,7 @@ if [ "$ENV" = "dev" ]; then
 			docker-machine ip $node &>/dev/null
 			if [ "$?" = "0" ]; then
 				echo "* building image on $node..."
-				docker-machine ssh $node docker build -t ${USER}/${NAME}:${TAG} $PWD
+				docker-machine ssh $node sudo docker build -t ${USER}/${NAME}:${TAG} $PWD
 			else
 				break
 			fi
