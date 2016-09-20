@@ -17,7 +17,7 @@ fi
 
 show ()
 {
-	$(dirname "$0")/util/tunnel $ENV 8080 /
+	$(dirname "$0")/../util/tunnel $ENV 8080 /
 }
 
 if [ ! "${NUM}" ]; then
