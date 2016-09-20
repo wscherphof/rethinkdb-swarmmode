@@ -11,7 +11,7 @@ PROTOCOL="$8"
 BROWSER="$9"
 
 echo "* starting service..."
-docker-machine ssh tst-manager-1 sudo docker service ps $NAME &>/dev/null
+docker-machine ssh ${ENV}-manager-1 sudo docker service ps $NAME &>/dev/null
 if [ "$?" = "0" ]; then
 	docker-machine ssh ${ENV}-manager-1 sudo docker service update --image ${USER}/${NAME}:${TAG} ${NAME}
 	docker-machine ssh ${ENV}-manager-1 sudo docker service scale ${NAME}=${REPLICAS}
