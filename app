@@ -21,4 +21,4 @@ fi
 
 echo "* connecting..."
 sleep 15
-$(dirname "$0")/tunnel $ENV $PORT $BROWSEPATH $PROTOCOL $BROWSER
+$(dirname "$0")/util/tunnel $ENV $PORT $BROWSEPATH $PROTOCOL $BROWSER

@@ -10,14 +10,18 @@ elif [[ "$2" = "create" ]]; then
 	NUM=${3-1}
 fi
 
-res=$(docker-machine ip ${ENV}-manager-1)
+docker-machine ip ${ENV}-manager-1 1>/dev/null
 if [ "$?" != "0" ]; then
-	echo -n "${res}"
 	exit 1
 fi
 
+show ()
+{
+	$(dirname "$0")/util/tunnel $ENV 8080 /
+}
+
 if [ ! "${NUM}" ]; then
-	$(dirname "$0")/tunnel $ENV 8080 /
+	show
 	exit
 fi
 
@@ -27,29 +31,30 @@ remove ()
 	eval $* 2>/dev/null
 }
 
+DOCKER="docker-machine ssh ${ENV}-manager-1 sudo docker"
 for i in $(seq 0 $NUM)
 do
-	remove docker-machine ssh ${ENV}-manager-1 sudo docker service rm db${i}
+	remove ${DOCKER} service rm db${i}
 done
 sleep 1
-remove docker-machine ssh ${ENV}-manager-1 sudo docker network rm dbnet
+remove ${DOCKER} network rm dbnet
 sleep 1
 echo "* creating dbnet..."
-docker-machine ssh ${ENV}-manager-1 sudo docker network create --driver overlay dbnet
+${DOCKER} network create --driver overlay dbnet
 
 for i in $(seq 0 $NUM)
 do
 	echo "* creating db${i}data..."
-	docker-machine ssh ${ENV}-manager-1 sudo docker volume create --name db${i}data
+	${DOCKER} volume create --name db${i}data
 	echo "* creating db${i}..."
 	if [ "$i" = "0" ]; then
-		docker-machine ssh ${ENV}-manager-1 sudo docker service create --name db0 --network dbnet --mount src=db0data,dst=/data --publish 8080:8080 rethinkdb
+		${DOCKER} service create --name db0 --network dbnet --mount src=db0data,dst=/data --publish 8080:8080 rethinkdb
 		sleep 10
 	else
-		docker-machine ssh ${ENV}-manager-1 sudo docker service create --name db${i} --network dbnet --mount src=db${i}data,dst=/data --mode global rethinkdb rethinkdb --join db0 --bind all
+		${DOCKER} service create --name db${i} --network dbnet --mount src=db${i}data,dst=/data --mode global rethinkdb rethinkdb --join db0 --bind all
 	fi
 done
 
 echo "* connecting..."
 sleep 15
-$(dirname "$0")/tunnel $ENV 8080 /
+show
