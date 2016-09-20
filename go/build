@@ -4,6 +4,10 @@ ENV="$1"
 USER="$2"
 NAME="$3"
 TAG="$4"
+PORT="$5"
+SOURCE="$6"
+
+pushd ${SOURCE} 1>/dev/null
 
 echo "* formatting source code..."
 go fmt
@@ -19,7 +23,7 @@ DIR="$(pwd | awk -F "/" '{print $NF}')" # Name of current subdirectory
 cat >> ./Dockerfile <<EOF
 FROM scratch
 ADD ${DIR} ${DIR}
-EXPOSE 9090
+EXPOSE ${PORT}
 ENTRYPOINT ["/${DIR}"]
 EOF
 
@@ -49,4 +53,5 @@ else
 	docker push ${USER}/${NAME}:${TAG}
 fi
 rm ./$DIR ./Dockerfile
-echo "* done"
+
+popd 1>/dev/null
