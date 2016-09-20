@@ -114,18 +114,16 @@ create ()
 	fi
 }
 
-cat >> ./firewall << EOF
+cat > ./firewall << EOF
 	sudo ufw default deny incoming
 	sudo ufw default allow outgoing
-	sudo ufw allow ssh
-	sudo ufw allow http
-	sudo ufw allow https
-	sudo ufw allow ntp
-	sudo ufw allow bootpc
-	sudo ufw allow bootps
-	sudo ufw allow 2376 # docker api
-	sudo ufw allow 2377 # docker swarm mode
-	sudo ufw allow 7946 # docker overlay network
+	sudo ufw allow ssh/tcp
+	sudo ufw allow http/tcp
+	sudo ufw allow https/tcp
+	sudo ufw allow 2376/tcp # docker api
+	sudo ufw allow 2377/tcp # docker swarm mode
+	sudo ufw allow 7946     # docker overlay network
+	sudo ufw allow 4789/udp # vxlan
 	sudo ufw --force enable
 EOF
 
