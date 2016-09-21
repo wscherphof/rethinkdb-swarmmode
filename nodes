@@ -82,7 +82,7 @@ elif [ "$2" = "rm" ]; then
 elif [ "$2" = "-d" -o "$2" = "--driver" ]; then
 	DRIVER="$3"
 	TYPE="$4"
-	FIREWALL="y"
+	FIREWALL="$(mktemp)"
 elif [ "$2" = "" -o "$2" = "manager" -o "$2" = "worker" ]; then
 	TYPE="$2"
 	DRIVER="virtualbox"
@@ -114,8 +114,8 @@ create ()
 	fi
 	if [ "$FIREWALL" ]; then
 		dir="$(docker-machine ssh $node pwd)"
-		docker-machine scp ./firewall ${node}:${dir}
-		docker-machine ssh $node . ${dir}/firewall
+		docker-machine scp ${FIREWALL} ${node}:${dir}/firewall
+		docker-machine ssh $node . ./firewall
 	fi
 	docker-machine restart $node
 	if [ "$?" != "0" ]; then
@@ -126,7 +126,7 @@ create ()
 	fi
 }
 
-cat > ./firewall << EOF
+cat 2>/dev/null 1> "${FIREWALL}" << EOF
 	sudo ufw default deny incoming
 	sudo ufw default allow outgoing
 	sudo ufw allow ssh/tcp
@@ -156,4 +156,4 @@ else
 	create worker 2
 fi
 
-rm ./firewall
+rm "${FIREWALL}" 2>/dev/null
