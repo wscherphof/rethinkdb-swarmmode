@@ -21,7 +21,7 @@ fi
 
 BINARY="$(pwd | awk -F "/" '{print $NF}')" # go build names the binary after the source's subdirectory
 
-cat >> ./Dockerfile <<EOF
+cat > ./Dockerfile <<EOF
 FROM scratch
 ADD ${BINARY} ${BINARY}
 EXPOSE ${PORT}
@@ -29,7 +29,7 @@ ENTRYPOINT ["/${BINARY}"]
 EOF
 
 if [ "$REMOTE" = "remote" ]; then
-	# Build on all nodes, using the VirtualBox machines' automatic /Users share, enabling to skip the push to the repository.
+	# Build on all nodes, skipping the push to the repository.
 	# Dirty, but quick.
 	for type in worker manager
 	do
@@ -49,8 +49,8 @@ if [ "$REMOTE" = "remote" ]; then
 		done
 	done
 else
-	# Build locally and use the repository to make the new image available to the nodes.
-	# Prettier, but slower.
+	# Build locally and use the repository for shipping the image to the nodes.
+	# Pretty, but slow.
 	echo "* building image..."
 	docker build -t ${USER}/${NAME}:${TAG} .
 	echo "* pushing image..."

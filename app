@@ -10,13 +10,15 @@ BROWSEPATH="$7"
 PROTOCOL="$8"
 BROWSER="$9"
 
+DOCKER="docker-machine ssh ${ENV}-manager-1 sudo docker"
+
 echo "* starting service..."
-docker-machine ssh ${ENV}-manager-1 sudo docker service ps $NAME &>/dev/null
+${DOCKER} service ps $NAME &>/dev/null
 if [ "$?" = "0" ]; then
-	docker-machine ssh ${ENV}-manager-1 sudo docker service update --image ${USER}/${NAME}:${TAG} ${NAME}
-	docker-machine ssh ${ENV}-manager-1 sudo docker service scale ${NAME}=${REPLICAS}
+	${DOCKER} service update --image ${USER}/${NAME}:${TAG} ${NAME}
+	${DOCKER} service scale ${NAME}=${REPLICAS}
 else
-	docker-machine ssh ${ENV}-manager-1 sudo docker service create --name ${NAME} --replicas ${REPLICAS} --network dbnet --publish ${PORT}:${PORT} ${USER}/${NAME}:${TAG}
+	${DOCKER} service create --name ${NAME} --replicas ${REPLICAS} --network dbnet --publish ${PORT}:${PORT} ${USER}/${NAME}:${TAG}
 fi
 
 echo "* connecting..."
