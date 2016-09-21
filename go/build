@@ -1,34 +1,43 @@
 #!/bin/bash
 
-ENV="$1"
-USER="$2"
-NAME="$3"
-TAG="$4"
-PORT="$5"
-SOURCE="$6"
-REMOTE="$7"
+usage () { echo "usage"; }
 
-pushd ${SOURCE} 1>/dev/null
+while getopts "t:p:e:a:" opt; do
+    case $opt in
+        t  ) TAG="$OPTARG";;
+        e  ) ENV="$OPTARG";;
+        p  ) PORTS+=("$OPTARG");;
+        a  ) ADDS+=("$OPTARG");;
+        # h  ) usage; exit;;
+        # \? ) echo "Unknown option: -$OPTARG" >&2; exit 1;;
+        # :  ) echo "Missing option argument for -$OPTARG" >&2; exit 1;;
+        # *  ) echo "Unimplemented option: -$OPTARG" >&2; exit 1;;
+    esac
+done
+shift $((OPTIND -1))
+
+pushd "$1" 1>/dev/null
+if [ "$?" != "0" ]; then
+	exit $?
+fi
 
 echo "* formatting source code..."
 go fmt
 echo "* compiling..."
 # cf. https://medium.com/@kelseyhightower/optimizing-docker-images-for-static-binaries-b5696e26eb07#.wmlq1nj3d
 CGO_ENABLED=0 GOOS=linux go build -a -tags netgo -ldflags '-w' .
-if [ "$?" != "0" ]; then
+if [ "${TAG}" = "" -o "$?" != "0" ]; then
 	exit $?
 fi
 
 BINARY="$(pwd | awk -F "/" '{print $NF}')" # go build names the binary after the source's subdirectory
 
-cat > ./Dockerfile <<EOF
-FROM scratch
-ADD ${BINARY} ${BINARY}
-EXPOSE ${PORT}
-ENTRYPOINT ["/${BINARY}"]
-EOF
+echo "FROM scratch" > ./Dockerfile
+echo "ADD ${BINARY} ${BINARY}" >> ./Dockerfile
+echo "EXPOSE ${PORTS[@]}" >> ./Dockerfile
+echo "ENTRYPOINT [\"/${BINARY}\"]" >> ./Dockerfile
 
-if [ "$REMOTE" = "remote" ]; then
+if [ "${ENV}" ]; then
 	# Build on all nodes, skipping the push to the repository.
 	# Dirty, but quick.
 	for type in worker manager
@@ -42,7 +51,11 @@ if [ "$REMOTE" = "remote" ]; then
 				dir="$(docker-machine ssh $node pwd)"
 				docker-machine scp ./${BINARY} ${node}:${dir}
 				docker-machine scp ./Dockerfile ${node}:${dir}
-				docker-machine ssh $node sudo docker build -t ${USER}/${NAME}:${TAG} .
+				for add in "${ADDS[@]}"; do
+					echo "ADD \"$(basename ${add})\"" \"/\" >> ./Dockerfile
+					docker-machine scp "${add}" ${node}:${dir}
+				done
+				docker-machine ssh $node sudo docker build -t ${TAG} .
 			else
 				break
 			fi
@@ -51,10 +64,13 @@ if [ "$REMOTE" = "remote" ]; then
 else
 	# Build locally and use the repository for shipping the image to the nodes.
 	# Pretty, but slow.
+	for add in "${ADDS[@]}"; do
+		echo "ADD \"${add}\" \"/\"" >> ./Dockerfile
+	done
 	echo "* building image..."
-	docker build -t ${USER}/${NAME}:${TAG} .
+	docker build -t ${TAG} .
 	echo "* pushing image..."
-	docker push ${USER}/${NAME}:${TAG}
+	docker push ${TAG}
 fi
 rm ./${BINARY} ./Dockerfile
 
