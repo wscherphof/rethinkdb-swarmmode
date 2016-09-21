@@ -6,7 +6,7 @@ BROWSEPATH="${3}"
 PROTOCOL="${4-http}"
 BROWSER="${5-open}"
 
-portsdir="${HOME}/.rethinkdb_swarmmode/ports/"
+portsdir="${HOME}/.rethinkswarmmode/ports/"
 mkdir -p ${portsdir}
 if [ -e "${portsdir}${ENV}" ]; then
 	PORT="$(cat ${portsdir}${ENV})"
