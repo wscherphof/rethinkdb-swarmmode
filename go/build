@@ -1,18 +1,35 @@
 #!/bin/bash
 
-usage () { echo "./go/build -e dev -p 80 -p 443 -A master -t wscherphof/expeertise:0.1 ../expeertise/"; }
+usage ()
+{
+	echo
+	echo "$(basename $0) formats & compiles go sources,"
+	echo "and builds a Docker image to run the result"
+	echo
+	echo "Usage:"
+	echo "  $(basename $0) [-p port ...] [-a filetoadd ...] [-A treeish] [-e env] [-t user/image:tag] sourcedir"
+	echo
+	echo "-t wscherphof/rethinkswarmmode:0.3 results in a Docker image with that name tag"
+	echo "   leave the -t option out to only compile the go sources"
+	echo "-e dev results in the image being built remotely, on each swarm node"
+	echo "   leave the -e option out to get it built locally & pushed to the repository"
+	echo "-p 80 -p 443 results in 'EXPOSE 80 443' in the Dockerfile"
+	echo "-a file1 -a file2 results in 'ADD file1 /' and 'ADD file2 /' in the Dockerfile"
+	echo "-A master results in getting the master branch of the complete sourcedir added to / in the image"
+	echo
+}
 
-while getopts "t:p:e:a:A:" opt; do
+while getopts "t:p:e:a:A:h" opt; do
     case $opt in
         t  ) TAG="$OPTARG";;
         e  ) ENV="$OPTARG";;
         p  ) PORTS+=("$OPTARG");;
         a  ) ADDS+=("$OPTARG");;
         A  ) TREEISH="$OPTARG";;
-        # h  ) usage; exit;;
-        # \? ) echo "Unknown option: -$OPTARG" >&2; exit 1;;
-        # :  ) echo "Missing option argument for -$OPTARG" >&2; exit 1;;
-        # *  ) echo "Unimplemented option: -$OPTARG" >&2; exit 1;;
+        h  ) usage; exit;;
+        \? ) echo "Unknown option: -$OPTARG" >&2; exit 1;;
+        :  ) echo "Missing option argument for -$OPTARG" >&2; exit 1;;
+        *  ) echo "Unimplemented option: -$OPTARG" >&2; exit 1;;
     esac
 done
 shift $((OPTIND -1))

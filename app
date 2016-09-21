@@ -1,8 +1,8 @@
 #!/bin/bash
 
-usage () { echo "./app -n dbnet -p 9090 -r 6 -b / -e dev -t wscherphof/expeertise:0.5 expeertise"; }
+usage () { echo "./app -n dbnet -p 9090 -r 6 -b /bar -e dev -t wscherphof/rethinkswarmmode:0.1 rethinkswarmmode"; }
 
-while getopts "t:n:p:e:a:r:b:P:B:" opt; do
+while getopts "t:n:p:e:a:r:b:P:B:h" opt; do
     case $opt in
         t  ) TAG="$OPTARG";;
         n  ) NETWORK="$OPTARG";;
@@ -12,10 +12,10 @@ while getopts "t:n:p:e:a:r:b:P:B:" opt; do
         b  ) BROWSEPATH="$OPTARG";;
         P  ) PROTOCOL="$OPTARG";;
         B  ) BROWSER="$OPTARG";;
-        # h  ) usage; exit;;
-        # \? ) echo "Unknown option: -$OPTARG" >&2; exit 1;;
-        # :  ) echo "Missing option argument for -$OPTARG" >&2; exit 1;;
-        # *  ) echo "Unimplemented option: -$OPTARG" >&2; exit 1;;
+        h  ) usage; exit;;
+        \? ) echo "Unknown option: -$OPTARG" >&2; exit 1;;
+        :  ) echo "Missing option argument for -$OPTARG" >&2; exit 1;;
+        *  ) echo "Unimplemented option: -$OPTARG" >&2; exit 1;;
     esac
 done
 shift $((OPTIND -1))
