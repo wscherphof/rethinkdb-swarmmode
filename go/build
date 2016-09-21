@@ -40,6 +40,8 @@ echo "ENTRYPOINT [\"/${BINARY}\"]" >> ./Dockerfile
 if [ "${ENV}" ]; then
 	# Build on all nodes, skipping the push to the repository.
 	# Dirty, but quick.
+	for add in "${ADDS[@]}"; do
+		echo "ADD \"$(basename ${add})\"" \"/\" >> ./Dockerfile
 	for type in worker manager
 	do
 		for (( i=1; ; i++ ))
@@ -52,7 +54,6 @@ if [ "${ENV}" ]; then
 				docker-machine scp ./${BINARY} ${node}:${dir}
 				docker-machine scp ./Dockerfile ${node}:${dir}
 				for add in "${ADDS[@]}"; do
-					echo "ADD \"$(basename ${add})\"" \"/\" >> ./Dockerfile
 					docker-machine scp "${add}" ${node}:${dir}
 				done
 				docker-machine ssh $node sudo docker build -t ${TAG} .
