@@ -1,10 +1,11 @@
 #!/bin/bash
 
-usage () { echo "./app -t wscherphof/expeertise:0.1 -p 9090 -p 10443 -r 6 -b / -e dev expeertise"; }
+usage () { echo "./app -n dbnet -p 9090 -r 6 -b / -e dev -t wscherphof/expeertise:0.5 expeertise"; }
 
-while getopts "t:p:e:a:r:b:P:B:" opt; do
+while getopts "t:n:p:e:a:r:b:P:B:" opt; do
     case $opt in
         t  ) TAG="$OPTARG";;
+        n  ) NETWORK="$OPTARG";;
         e  ) ENV="$OPTARG";;
         r  ) REPLICAS="$OPTARG";;
         p  ) PORTS+=("$OPTARG");;
@@ -33,7 +34,7 @@ else
 	for port in "${PORTS[@]}"; do
 		PUBLISH="${PUBLISH} --publish ${port}:${port}"
 	done
-	${DOCKER} service create --name ${NAME} --replicas ${REPLICAS} --network dbnet ${PUBLISH} ${TAG}
+	${DOCKER} service create --name ${NAME} --replicas ${REPLICAS} --network ${NETWORK} ${PUBLISH} ${TAG}
 fi
 
 echo "* connecting..."
