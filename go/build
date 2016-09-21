@@ -1,13 +1,14 @@
 #!/bin/bash
 
-usage () { echo "./go/build -t wscherphof/expeertise:0.1 -p 9090 -p 10443 -a ./certs/cert.pem -a ./certs/key.pem -e dev ../expeertise/"; }
+usage () { echo "./go/build -e dev -p 80 -p 443 -A master -t wscherphof/expeertise:0.1 ../expeertise/"; }
 
-while getopts "t:p:e:a:" opt; do
+while getopts "t:p:e:a:A:" opt; do
     case $opt in
         t  ) TAG="$OPTARG";;
         e  ) ENV="$OPTARG";;
         p  ) PORTS+=("$OPTARG");;
         a  ) ADDS+=("$OPTARG");;
+        A  ) TREEISH="$OPTARG";;
         # h  ) usage; exit;;
         # \? ) echo "Unknown option: -$OPTARG" >&2; exit 1;;
         # :  ) echo "Missing option argument for -$OPTARG" >&2; exit 1;;
@@ -33,9 +34,14 @@ fi
 BINARY="$(pwd | awk -F "/" '{print $NF}')" # go build names the binary after the source's subdirectory
 
 echo "FROM scratch" > ./Dockerfile
-echo "ADD ${BINARY} ${BINARY}" >> ./Dockerfile
+echo "ADD ${BINARY} /" >> ./Dockerfile
 echo "EXPOSE ${PORTS[@]}" >> ./Dockerfile
 echo "ENTRYPOINT [\"/${BINARY}\"]" >> ./Dockerfile
+
+if [ "${TREEISH}" ]; then
+	echo "ADD archive.tar.gz /" >> ./Dockerfile
+	git archive --format tar.gz -o archive.tar.gz ${TREEISH} .
+fi
 
 if [ "${ENV}" ]; then
 	# Build on all nodes, skipping the push to the repository.
@@ -52,6 +58,9 @@ if [ "${ENV}" ]; then
 			if [ "$?" = "0" ]; then
 				echo "* building image on $node..."
 				dir="$(docker-machine ssh $node pwd)"
+				if [ "${TREEISH}" ]; then
+					docker-machine scp ./archive.tar.gz ${node}:${dir}
+				fi
 				docker-machine scp ./${BINARY} ${node}:${dir}
 				docker-machine scp ./Dockerfile ${node}:${dir}
 				for add in "${ADDS[@]}"; do
@@ -74,6 +83,6 @@ else
 	echo "* pushing image..."
 	docker push ${TAG}
 fi
-rm ./${BINARY} ./Dockerfile
+rm ./${BINARY} ./Dockerfile ./archive.tar.gz
 
 popd 1>/dev/null
