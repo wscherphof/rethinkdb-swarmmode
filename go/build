@@ -1,6 +1,6 @@
 #!/bin/bash
 
-usage () { echo "usage"; }
+usage () { echo "./go/build -t wscherphof/expeertise:0.1 -p 9090 -p 10443 -a ./certs/cert.pem -a ./certs/key.pem -e dev ../expeertise/"; }
 
 while getopts "t:p:e:a:" opt; do
     case $opt in
@@ -42,6 +42,7 @@ if [ "${ENV}" ]; then
 	# Dirty, but quick.
 	for add in "${ADDS[@]}"; do
 		echo "ADD \"$(basename ${add})\"" \"/\" >> ./Dockerfile
+	done
 	for type in worker manager
 	do
 		for (( i=1; ; i++ ))

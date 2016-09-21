@@ -1,6 +1,6 @@
 #!/bin/bash
 
-usage () { echo "usage"; }
+usage () { echo "./app -t wscherphof/expeertise:0.1 -p 9090 -p 10443 -r 6 -b / -e dev expeertise"; }
 
 while getopts "t:p:e:a:r:b:P:B:" opt; do
     case $opt in
