@@ -7,22 +7,21 @@ usage ()
 	echo "and builds a Docker image to run the result"
 	echo
 	echo "Usage:"
-	echo "  $(basename $0) [-p port ...] [-a filetoadd ...] [-A treeish] [-e env] [-t user/image:tag] sourcedir"
+	echo "  $(basename $0) [-p port ...] [-a filetoadd ...] [-A treeish] [-t user/image:tag] sourcedir [env]"
 	echo
 	echo "-t wscherphof/rethinkswarmmode:0.3 results in a Docker image with that name tag"
 	echo "   leave the -t option out to only compile the go sources"
-	echo "-e dev results in the image being built remotely, on each swarm node"
-	echo "   leave the -e option out to get it built locally & pushed to the repository"
 	echo "-p 80 -p 443 results in 'EXPOSE 80 443' in the Dockerfile"
 	echo "-a file1 -a file2 results in 'ADD file1 /' and 'ADD file2 /' in the Dockerfile"
 	echo "-A master results in getting the master branch of the complete sourcedir added to / in the image"
+	echo "Specifying an environment/swarm at the end results in the image being built remotely on each swarm node"
+	echo "Leave the env out to get it built locally & pushed to the repository"
 	echo
 }
 
-while getopts "t:p:e:a:A:h" opt; do
+while getopts "t:p:a:A:h" opt; do
     case $opt in
         t  ) TAG="$OPTARG";;
-        e  ) ENV="$OPTARG";;
         p  ) PORTS+=("$OPTARG");;
         a  ) ADDS+=("$OPTARG");;
         A  ) TREEISH="$OPTARG";;
@@ -60,6 +59,7 @@ if [ "${TREEISH}" ]; then
 	git archive --format tar.gz -o archive.tar.gz ${TREEISH} .
 fi
 
+ENV="$2"
 if [ "${ENV}" ]; then
 	# Build on all nodes, skipping the push to the repository.
 	# Dirty, but quick.

@@ -1,12 +1,11 @@
 #!/bin/bash
 
-usage () { echo "./app -n dbnet -p 9090 -r 6 -b /bar -e dev -t wscherphof/rethinkswarmmode:0.1 rethinkswarmmode"; }
+usage () { echo "./app -n dbnet -p 9090 -r 6 -b /bar -t wscherphof/rethinkswarmmode:0.1 rethinkswarmmode dev"; }
 
-while getopts "t:n:p:e:a:r:b:P:B:h" opt; do
+while getopts "t:n:p:a:r:b:P:B:h" opt; do
     case $opt in
         t  ) TAG="$OPTARG";;
         n  ) NETWORK="$OPTARG";;
-        e  ) ENV="$OPTARG";;
         r  ) REPLICAS="$OPTARG";;
         p  ) PORTS+=("$OPTARG");;
         b  ) BROWSEPATH="$OPTARG";;
@@ -21,7 +20,7 @@ done
 shift $((OPTIND -1))
 
 NAME="$1"
-
+ENV="$2"
 DOCKER="docker-machine ssh ${ENV}-manager-1 sudo docker"
 
 echo "* starting service..."
