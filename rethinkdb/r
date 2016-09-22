@@ -1,14 +1,40 @@
 #!/bin/bash
 
+usage ()
+{
+	echo
+	echo "$(basename $0) creates a RethinkDB cluster on a swarm, or starts its web admin"
+	echo
+	echo "Usage:"
+	echo
+	echo "$(basename $0) -c [-n number] <swarm>"
+	echo "  creates the a cluster (removing an existing one, keeping its data volumes)"
+	echo "  <swarm> names the swarm"
+	echo "  -n specifies the number of servers on each node; default is 1"
+	echo
+	echo "$(basename $0) <swarm>"
+	echo "  starts the web admin"
+	echo
+}
+
+while getopts "n:ch" opt; do
+    case $opt in
+        n  ) NUM="$OPTARG";;
+        c  ) CREATE="y";;
+        h  ) usage; exit;;
+        \? ) echo "Unknown option: -$OPTARG" >&2; exit 1;;
+        :  ) echo "Missing option argument for -$OPTARG" >&2; exit 1;;
+        *  ) echo "Unimplemented option: -$OPTARG" >&2; exit 1;;
+    esac
+done
+shift $((OPTIND -1))
+
 ENV="$1"
 if [ ! "$ENV" ]; then
-	echo "Usage:"
-	echo " $(basename $0) env"
-	echo " $(basename $0) env create [number of servers per node; default=1]"
+	usage
 	exit 1
-elif [[ "$2" = "create" ]]; then
-	NUM=${3-1}
 fi
+NUM="${NUM-1}"
 
 docker-machine ip ${ENV}-manager-1 1>/dev/null
 if [ "$?" != "0" ]; then
@@ -20,7 +46,7 @@ show ()
 	$(dirname "$0")/../util/tunnel $ENV 8080 /
 }
 
-if [ ! "${NUM}" ]; then
+if [ ! "${CREATE}" ]; then
 	show
 	exit
 fi
