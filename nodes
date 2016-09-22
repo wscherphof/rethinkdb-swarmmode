@@ -3,46 +3,60 @@
 usage ()
 {
 	echo
-	echo "$(basename $0) creates one or more Docker machines (nodes),"
-	echo "and adds them to a specific swarm (a named 'environment')"
+	echo "$(basename $0) manages nodes in a specific swarm"
 	echo
 	echo "Usage:"
-	echo "  $(basename $0) env [-d driver] [type; manager or worker]"
-	echo "  $(basename $0) env stop"
-	echo "  $(basename $0) env start"
-	echo "  $(basename $0) env rm"
 	echo
-	echo "e.g. $(basename $0) dev"
-	echo "  creates dev-manager-1, dev-worker-1, and dev-worker-2 on virtualbox"
+	echo "$(basename $0) [-m managers] [-w workers] [-d driver] [-F] create <swarm>"
+	echo "  creates the specified number of manager and worker nodes"
+	echo "  <swarm> names the swarm"
+	echo "  for a new swarm, specify at least 1 manager"
+	echo "  -d specifies a docker-machine driver; default is virtualbox"
+	echo "  -F enables a UFW firewall on the node"
 	echo
-	echo "e.g. $(basename $0) dev worker"
-	echo "  creates an extra worker (dev-worker-3) on virtualbox"
+	echo "$(basename $0) stop <swarm>"
+	echo "  stops all nodes in the given swarm"
 	echo
-	echo "e.g. $(basename $0) tst -d digitalocean"
-	echo "  creates tst-manager-1, tst-worker-1, and tst-worker-2 on digitalocean"
-	echo "  use environment values to specify mandatory and optional settings"
+	echo "$(basename $0) start <swarm>"
+	echo "  stops all nodes in the given swarm"
 	echo
-	echo "e.g. $(basename $0) tst -d google worker"
-	echo "  creates an extra worker (tst-worker-3) on google compute engine"
-	echo "  use environment values to specify mandatory and optional settings"
+	echo "$(basename $0) [-f] rm <swarm>"
+	echo "  removes all nodes in the given swarm"
+	echo "  -f skips the confirmation question"
 	echo
-	echo "e.g. $(basename $0) dev stop"
-	echo "  stops all dev nodes"
-	echo
-	echo "e.g. $(basename $0) dev start"
-	echo "  starts all dev nodes"
-	echo
-	echo "e.g. $(basename $0) dev rm"
-	echo "  removes all dev nodes"
-	echo
-	exit 1
 }
 
-if [ "$1" = "" -o "$1" = "help" -o "$1" = "-h" -o "$1" = "--help" ]; then
+while getopts "m:w:d:fFh" opt; do
+    case $opt in
+        m  ) MANAGERS="$OPTARG";;
+        w  ) WORKERS="$OPTARG";;
+        d  ) DRIVER="$OPTARG";;
+        f  ) FORCE="y";;
+        F  ) FIREWALL="$(mktemp)";;
+        h  ) usage; exit;;
+        \? ) echo "Unknown option: -$OPTARG" >&2; exit 1;;
+        :  ) echo "Missing option argument for -$OPTARG" >&2; exit 1;;
+        *  ) echo "Unimplemented option: -$OPTARG" >&2; exit 1;;
+    esac
+done
+shift $((OPTIND -1))
+
+MANAGERS="${MANAGERS-0}"
+WORKERS="${WORKERS-0}"
+DRIVER="${DRIVER-virtualbox}"
+COMMAND="$1"
+ENV="$2"
+
+if [ "$COMMAND" = "" -o "$COMMAND" = "help" -o "$ENV" = "" ]; then
 	usage
-else
-	ENV="$1"
 fi
+
+finish ()
+{
+	wait
+	rm "${FIREWALL}" 2>/dev/null
+	exit $1
+}
 
 loop ()
 {
@@ -53,7 +67,7 @@ loop ()
 		do
 			docker-machine status ${ENV}-${type}-${i} &>/dev/null
 			if [ "$?" = "0" ]; then
-				docker-machine $command ${ENV}-${type}-${i}
+				docker-machine $command ${ENV}-${type}-${i} &
 			else
 				break
 			fi
@@ -61,44 +75,29 @@ loop ()
 	done
 }
 
-remove ()
-{
-	read -p "Type Y to remove ALL ${ENV} nodes... " answer
-	if [ "$answer" != "Y" ]; then
-		return
-	fi
-	loop "rm -f"
-}
-
-if [ "$2" = "stop" ]; then
-	loop "stop"
-	exit 0
-elif [ "$2" = "start" ]; then
-	loop "start"
-	exit 0
-elif [ "$2" = "rm" ]; then
-	remove
-	exit 0
-elif [ "$2" = "-d" -o "$2" = "--driver" ]; then
-	DRIVER="$3"
-	TYPE="$4"
-	FIREWALL="$(mktemp)"
-elif [ "$2" = "" -o "$2" = "manager" -o "$2" = "worker" ]; then
-	TYPE="$2"
-	DRIVER="virtualbox"
-else
-	usage
-fi
-
 create ()
 {
 	type="$1"
 	number="$2"
 	node="${ENV}-${type}-${number}"
+	if [ "${type}-${number}" != "manager-1" ]; then
+		status=$(docker-machine status ${ENV}-manager-1 2>/dev/null)
+		if [ "$?" != "0" ]; then
+			echo "* create at least 1 manager"
+			finish 1
+		elif [ "$status" != "Running" ]; then
+			echo "* Waiting for ${ENV}-manager-1 to start..."
+			docker-machine start ${ENV}-manager-1
+		fi
+	fi
 	docker-machine create --driver $DRIVER $node
 	if [ "$?" != "0" ]; then
 		echo "* $node create failed"
-		return 1
+		if [ "${type}-${number}" = "manager-1" ]; then
+			finish 1
+		else
+			return 1
+		fi
 	fi
 	MANAGER_IP="$(docker-machine ip ${ENV}-manager-1)"
 	if [ "$type" = "manager" ]; then
@@ -139,21 +138,56 @@ cat 2>/dev/null 1> "${FIREWALL}" << EOF
 	sudo ufw --force enable
 EOF
 
-if [ "$TYPE" ]; then
-	for (( i=1; ; i++ ))
-	do
-		docker-machine status ${ENV}-${TYPE}-${i} &>/dev/null
-		if [ "$?" != "0" ]; then
-			NUMBER="$i"
-			break
+if [ "$COMMAND" = "stop" ]; then
+	loop "stop"
+	finish 0
+elif [ "$COMMAND" = "start" ]; then
+	loop "start"
+	finish 0
+elif [ "$COMMAND" = "rm" ]; then
+	if [ ! "$FORCE" ]; then
+		read -p "Type Y to remove ALL nodes in swarm '${ENV}'... " answer
+		if [ "$answer" != "Y" ]; then
+			finish 0
 		fi
+	fi
+	loop "rm -f"
+	finish 0
+elif [ "$COMMAND" = "create" ]; then
+	total=$(expr "$MANAGERS" + "$WORKERS" 2>/dev/null)
+	if [ "$?" != "0" -o "$total" -lt 1 ]; then
+		usage
+		finish 1
+	fi
+	for type in manager worker
+	do
+		for (( i=1; ; i++ ))
+		do
+			docker-machine status ${ENV}-${type}-${i} &>/dev/null
+			if [ "$?" != "0" ]; then
+				next="$i"
+				break
+			fi
+		done
+		if [ "${type}" = "manager" ]; then
+			number="$MANAGERS"
+		else
+			number="$WORKERS"
+		fi
+		for (( i=0; i<"$number" ; i++ ))
+		do
+			new=$(expr $next + $i)
+			if [ "${type}" = "manager" -a "$new" = "1" ]; then
+				create $type $new
+			else
+				create $type $new &
+			fi
+		done
 	done
-	create $TYPE $NUMBER
 else
-	remove
-	create manager 1
-	create worker 1 &
-	create worker 2
+	usage
+	finish 1
 fi
 
-rm "${FIREWALL}" 2>/dev/null
+finish
+
