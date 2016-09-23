@@ -40,6 +40,9 @@ fi
 
 echo "* formatting source code..."
 go fmt
+if [ "$?" != "0" ]; then
+	exit $?
+fi
 echo "* compiling..."
 # cf. https://medium.com/@kelseyhightower/optimizing-docker-images-for-static-binaries-b5696e26eb07#.wmlq1nj3d
 CGO_ENABLED=0 GOOS=linux go build -a -tags netgo -ldflags '-w' .
