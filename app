@@ -42,6 +42,9 @@ fi
 REPLICAS=${REPLICAS-1}
 DOCKER="docker-machine ssh ${ENV}-manager-1 sudo docker"
 
+echo "* creating appdata..."
+${DOCKER} volume create --name appdata
+
 echo "* starting service..."
 ${DOCKER} service ps $NAME &>/dev/null
 if [ "$?" = "0" ]; then
@@ -55,7 +58,7 @@ else
     for port in "${TUNNELS[@]}"; do
         PUBLISH="${PUBLISH} --publish ${port}:${port}"
     done
-	${DOCKER} service create --name ${NAME} --replicas ${REPLICAS} ${NETWORK} ${PUBLISH} ${TAG}
+	${DOCKER} service create --name ${NAME} --replicas ${REPLICAS} --mount src=appdata,dst=/appdata ${NETWORK} ${PUBLISH} ${TAG}
 fi
 
 if [ "${TUNNELS[@]}" ]; then
