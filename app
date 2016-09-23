@@ -1,16 +1,29 @@
 #!/bin/bash
 
-usage () { echo "./app -n dbnet -p 9090 -r 6 -b /bar -t wscherphof/rethinkswarmmode:0.1 rethinkswarmmode dev"; }
+usage ()
+{
+    echo
+    echo "$(basename $0) creates or updates a swarm application service"
+    echo
+    echo "Usage:"
+    echo
+    echo "$(basename $0) [-n network] [-p port ...] [-t port ...] [-r replicas] <image> <name> <swarm>"
+    echo "  creates a service named <name>, running Docker image tag <image> on the swarm named <swarm>"
+    echo "  or updates the existing service to the new image tag"
+    echo "  and/or scales it to the given number of replicas (default=1)"
+    echo "  <image> takes the form repo/name:tag"
+    echo "  -n specifies the swarm overlay network to run in"
+    echo "  -p specifies any ports to publish (without creating an ssh tunnel)"
+    echo "  -t specifies any ports to publish and create an ssh tunnel to"
+    echo
+}
 
-while getopts "t:n:p:a:r:b:P:B:h" opt; do
+while getopts "n:p:t:r:h" opt; do
     case $opt in
-        t  ) TAG="$OPTARG";;
-        n  ) NETWORK="$OPTARG";;
-        r  ) REPLICAS="$OPTARG";;
+        n  ) NETWORK="--network $OPTARG";;
         p  ) PORTS+=("$OPTARG");;
-        b  ) BROWSEPATH="$OPTARG";;
-        P  ) PROTOCOL="$OPTARG";;
-        B  ) BROWSER="$OPTARG";;
+        t  ) TUNNELS+=("$OPTARG");;
+        r  ) REPLICAS="$OPTARG";;
         h  ) usage; exit;;
         \? ) echo "Unknown option: -$OPTARG" >&2; exit 1;;
         :  ) echo "Missing option argument for -$OPTARG" >&2; exit 1;;
@@ -19,8 +32,14 @@ while getopts "t:n:p:a:r:b:P:B:h" opt; do
 done
 shift $((OPTIND -1))
 
-NAME="$1"
-ENV="$2"
+TAG="$1"
+NAME="$2"
+ENV="$3"
+if [ ! "$TAG" -o ! "$NAME" -o ! "$ENV" ]; then
+    usage
+    exit 1
+fi
+REPLICAS=${REPLICAS-1}
 DOCKER="docker-machine ssh ${ENV}-manager-1 sudo docker"
 
 echo "* starting service..."
@@ -30,14 +49,19 @@ if [ "$?" = "0" ]; then
 	${DOCKER} service scale ${NAME}=${REPLICAS}
 else
 	PUBLISH=""
-	for port in "${PORTS[@]}"; do
-		PUBLISH="${PUBLISH} --publish ${port}:${port}"
-	done
-	${DOCKER} service create --name ${NAME} --replicas ${REPLICAS} --network ${NETWORK} ${PUBLISH} ${TAG}
+    for port in "${PORTS[@]}"; do
+        PUBLISH="${PUBLISH} --publish ${port}:${port}"
+    done
+    for port in "${TUNNELS[@]}"; do
+        PUBLISH="${PUBLISH} --publish ${port}:${port}"
+    done
+	${DOCKER} service create --name ${NAME} --replicas ${REPLICAS} ${NETWORK} ${PUBLISH} ${TAG}
 fi
 
-echo "* connecting..."
-sleep 15
-for port in "${PORTS[@]}"; do
-	$(dirname "$0")/util/tunnel $ENV $port $BROWSEPATH $PROTOCOL $BROWSER
-done
+if [ "${TUNNELS[@]}" ]; then
+    echo "* connecting..."
+    sleep 15
+    for port in "${TUNNELS[@]}"; do
+        $(dirname "$0")/util/tunnel $ENV $port
+    done
+fi
