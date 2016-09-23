@@ -8,8 +8,7 @@ usage ()
 	echo "Usage:"
 	echo
 	echo "$(basename $0) [-m managers] [-w workers] [-d driver] [-F] create <swarm>"
-	echo "  creates the specified number of manager and worker nodes"
-	echo "  <swarm> names the swarm"
+	echo "  creates the specified number of manager and worker nodes in the swarm named <swarm>"
 	echo "  for a new swarm, specify at least 1 manager"
 	echo "  -d specifies a docker-machine driver; default is virtualbox"
 	echo "  -F enables a UFW firewall on the node"
@@ -47,8 +46,14 @@ DRIVER="${DRIVER-virtualbox}"
 COMMAND="$1"
 ENV="$2"
 
-if [ "$COMMAND" = "" -o "$COMMAND" = "help" -o "$ENV" = "" ]; then
+if [ "$COMMAND" = "" -o "$ENV" = "" ]; then
 	usage
+	exit 1
+fi
+
+if [ "$COMMAND" = "help" -o "$COMMAND" = "--help" ]; then
+	usage
+	exit
 fi
 
 finish ()
