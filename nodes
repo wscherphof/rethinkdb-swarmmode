@@ -3,35 +3,38 @@
 usage ()
 {
 	echo
-	echo "$(basename $0) manages nodes in a specific swarm"
+	echo "Usage: $(basename $0) [OPTIONS] COMMAND SWARM"
 	echo
-	echo "Usage:"
+	echo "Manage nodes in a swarm"
 	echo
-	echo "$(basename $0) [-m managers] [-w workers] [-d driver] [-F] create <swarm>"
-	echo "  creates the specified number of manager and worker nodes in the swarm named <swarm>"
-	echo "  for a new swarm, specify at least 1 manager"
-	echo "  -d specifies a docker-machine driver; default is virtualbox"
-	echo "  -F enables a UFW firewall on the node"
-	echo
-	echo "$(basename $0) stop <swarm>"
-	echo "  stops all nodes in the given swarm"
-	echo
-	echo "$(basename $0) start <swarm>"
-	echo "  stops all nodes in the given swarm"
-	echo
-	echo "$(basename $0) [-f] rm <swarm>"
-	echo "  removes all nodes in the given swarm"
-	echo "  -f skips the confirmation question"
+	echo "Commands:"
+	echo "  create"
+	echo "    Create manager and/or worker nodes in swarm SWARM - for a new swarm, specify at least 1 manager"
+	echo "    Options:"
+	echo "      -m managers  number of manager nodes to create"
+	echo "      -w workers   number of worker nodes to create"
+	echo "      -d driver    numberDocker Machine driver to use (default: virtualbox)"
+	echo "      -F           set up an UFW firewall on each node"
+	echo "      -D domain    configure SWARM.DOMAIN as a hostname in /etc/hosts (on creation of first manager node)"
+	echo "  stop"
+	echo "    Stop all nodes swarm SWARM"
+	echo "  start"
+	echo "    Start all nodes swarm SWARM"
+	echo "  rm"
+	echo "    Remove all nodes swarm SWARM"
+	echo "    Options:"
+	echo "      -f           skip the confirmation question"
 	echo
 }
 
-while getopts "m:w:d:fFh" opt; do
+while getopts "m:w:d:D:fFh" opt; do
     case $opt in
         m  ) MANAGERS="$OPTARG";;
         w  ) WORKERS="$OPTARG";;
         d  ) DRIVER="$OPTARG";;
         f  ) FORCE="y";;
         F  ) FIREWALL="$(mktemp)";;
+        D  ) DOMAIN="$OPTARG";;
         h  ) usage; exit;;
         \? ) echo "Unknown option: -$OPTARG" >&2; exit 1;;
         :  ) echo "Missing option argument for -$OPTARG" >&2; exit 1;;
@@ -184,6 +187,14 @@ elif [ "$COMMAND" = "create" ]; then
 			new=$(expr $next + $i)
 			if [ "${type}" = "manager" -a "$new" = "1" ]; then
 				create $type $new
+				if [ "$DOMAIN" ]; then
+					echo "Root password possibly requested to edit /etc/hosts..."
+					if [ "$(grep "${ENV}.${DOMAIN}" /etc/hosts)" = "" ]; then
+						echo "${MANAGER_IP} ${ENV}.${DOMAIN}" | sudo tee -a /etc/hosts >/dev/null
+					else
+						sudo sed -i.bak "s/.*${ENV}.${DOMAIN}/${MANAGER_IP} ${ENV}.${DOMAIN}/" /etc/hosts
+					fi
+				fi
 			else
 				create $type $new &
 			fi
