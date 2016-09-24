@@ -3,24 +3,27 @@
 usage ()
 {
     echo
-    echo "$(basename $0) creates or updates a swarm application service"
+    echo "Usage: $(basename $0) [OPTIONS] NAME IMAGE SWARM"
     echo
-    echo "Usage:"
+    echo "Create or update a swarm application service"
     echo
-    echo "$(basename $0) [-n network] [-p port ...] [-t port ...] [-r replicas] <image> <name> <swarm>"
-    echo "  creates a service named <name>, running Docker image tag <image> on the swarm named <swarm>"
-    echo "  or updates the existing service to the new image tag"
-    echo "  and/or scales it to the given number of replicas (default=1)"
-    echo "  <image> takes the form repo/name:tag"
-    echo "  -n specifies the swarm overlay network to run in"
-    echo "  -p specifies any ports to publish (without creating an ssh tunnel)"
-    echo "  -t specifies any ports to publish and create an ssh tunnel to"
+    echo "NAME   service name"
+    echo "IMAGE  repo/name:tag identifying the image"
+    echo "SWARM  swarm to create the service on"
+    echo
+    echo "Options:"
+    echo "  -n network    swarm overlay network the service connects to (default: dbnet)"
+    echo "  -p port ...   ports to publish (without creating an ssh tunnel)"
+    echo "  -t port ...   ports to publish (and create an ssh tunnel to)"
+    echo "  -r replicas   number of replicas to run (default: 1)"
+    echo
+    echo "A volume appdata is mounted on /appdata"
     echo
 }
 
 while getopts "n:p:t:r:h" opt; do
     case $opt in
-        n  ) NETWORK="--network $OPTARG";;
+        n  ) NETWORK="$OPTARG";;
         p  ) PORTS+=("$OPTARG");;
         t  ) TUNNELS+=("$OPTARG");;
         r  ) REPLICAS="$OPTARG";;
@@ -32,14 +35,16 @@ while getopts "n:p:t:r:h" opt; do
 done
 shift $((OPTIND -1))
 
-TAG="$1"
-NAME="$2"
+NAME="$1"
+TAG="$2"
 ENV="$3"
 if [ ! "$TAG" -o ! "$NAME" -o ! "$ENV" ]; then
     usage
     exit 1
 fi
 REPLICAS=${REPLICAS-1}
+NETWORK=${NETWORK-dbnet}
+
 DOCKER="docker-machine ssh ${ENV}-manager-1 sudo docker"
 
 echo "* creating appdata..."
@@ -58,7 +63,7 @@ else
     for port in "${TUNNELS[@]}"; do
         PUBLISH="${PUBLISH} --publish ${port}:${port}"
     done
-	${DOCKER} service create --name ${NAME} --replicas ${REPLICAS} --mount src=appdata,dst=/appdata ${NETWORK} ${PUBLISH} ${TAG}
+	${DOCKER} service create --name ${NAME} --replicas ${REPLICAS} --mount src=appdata,dst=/appdata --network ${NETWORK} ${PUBLISH} ${TAG}
 fi
 
 if [ "${TUNNELS[@]}" ]; then

@@ -3,25 +3,23 @@
 usage ()
 {
 	echo
-	echo "$(basename $0) formats & compiles go sources,"
-	echo "and builds a Docker image to run the result"
+	echo "Usage: $(basename $0) [OPTIONS] SOURCEDIR IMAGE [SWARM]"
 	echo
-	echo "Usage:"
-	echo "  $(basename $0) [-p port ...] [-a filetoadd ...] [-A treeish] [-t user/image:tag] sourcedir [env]"
+	echo "Formats & compile go sources, and build a Docker image"
 	echo
-	echo "-t wscherphof/rethinkswarmmode:0.3 results in a Docker image with that name tag"
-	echo "   leave the -t option out to only compile the go sources"
-	echo "-p 80 -p 443 results in 'EXPOSE 80 443' in the Dockerfile"
-	echo "-a file1 -a file2 results in 'ADD file1 /' and 'ADD file2 /' in the Dockerfile"
-	echo "-A master results in getting the master branch of the complete sourcedir added to / in the image"
-	echo "Specifying an environment/swarm at the end results in the image being built remotely on each swarm node"
-	echo "Leave the env out to get it built locally & pushed to the repository"
+	echo "SOURCEDIR  directory containing the sources to compile"
+	echo "IMAGE      repo/name:tag identifying the image"
+	echo "SWARM      swarm on which nodes to build the image (instead of building locally, then pushing to reporitory)"
+	echo
+	echo "Options:"
+	echo "  -p port ...  ports for the image to EXPOSE"
+	echo "  -a file ...  files to ADD to the image's / folder (path relative to SOURCEDIR)"
+	echo "  -A treeish   git branch/tag of the complete SOURCEDIR to ADD to the image's / folder"
 	echo
 }
 
-while getopts "t:p:a:A:h" opt; do
+while getopts "p:a:A:h" opt; do
     case $opt in
-        t  ) TAG="$OPTARG";;
         p  ) PORTS+=("$OPTARG");;
         a  ) ADDS+=("$OPTARG");;
         A  ) TREEISH="$OPTARG";;
@@ -33,22 +31,24 @@ while getopts "t:p:a:A:h" opt; do
 done
 shift $((OPTIND -1))
 
+continue ()
+{
+	if [ "$?" != "0" ]; then
+		exit $?
+	fi
+}
+
 pushd "$1" 1>/dev/null
-if [ "$?" != "0" ]; then
-	exit $?
-fi
+continue
 
 echo "* formatting source code..."
 go fmt
-if [ "$?" != "0" ]; then
-	exit $?
-fi
+continue
+
 echo "* compiling..."
 # cf. https://medium.com/@kelseyhightower/optimizing-docker-images-for-static-binaries-b5696e26eb07#.wmlq1nj3d
 CGO_ENABLED=0 GOOS=linux go build -a -tags netgo -ldflags '-w' .
-if [ "${TAG}" = "" -o "$?" != "0" ]; then
-	exit $?
-fi
+continue
 
 BINARY="$(pwd | awk -F "/" '{print $NF}')" # go build names the binary after the source's subdirectory
 
@@ -62,7 +62,8 @@ if [ "${TREEISH}" ]; then
 	git archive --format tar.gz -o archive.tar.gz ${TREEISH} .
 fi
 
-ENV="$2"
+TAG="$2"
+ENV="$3"
 if [ "${ENV}" ]; then
 	# Build on all nodes, skipping the push to the repository.
 	# Dirty, but quick.
