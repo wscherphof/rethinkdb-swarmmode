@@ -75,8 +75,12 @@ if [ "${ENV}" ]; then
 		for (( i=1; ; i++ ))
 		do
 			node="${ENV}-${type}-${i}"
-			docker-machine status $node &>/dev/null
-			if [ "$?" = "0" ]; then
+			status=$(docker-machine status $node 2>/dev/null)
+			if [ "$?" != "0" ]; then
+				break
+			elif [ "$status" != "Running" ]; then
+				echo "* WARNING: $node is not running"
+			else
 				echo "* building image on $node..."
 				dir="$(docker-machine ssh $node pwd)"
 				if [ "${TREEISH}" ]; then
@@ -88,8 +92,6 @@ if [ "${ENV}" ]; then
 					docker-machine scp "${add}" ${node}:${dir}
 				done
 				docker-machine ssh $node sudo docker build -t ${TAG} .
-			else
-				break
 			fi
 		done
 	done
