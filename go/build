@@ -96,12 +96,12 @@ if [ "${SWARM}" ]; then
 				docker-machine ssh $node mkdir -p ${BINARY}
 				dir="$(docker-machine ssh $node pwd)/${BINARY}"
 				if [ "${TREEISH}" ]; then
-					docker-machine scp ./archive.tar.gz ${node}:${dir}
+					docker-machine scp ./archive.tar.gz ${node}:${dir} 1>/dev/null
 				fi
-				docker-machine scp ./${BINARY} ${node}:${dir}
-				docker-machine scp ./Dockerfile ${node}:${dir}
+				docker-machine scp ./${BINARY} ${node}:${dir} 1>/dev/null
+				docker-machine scp ./Dockerfile ${node}:${dir} 1>/dev/null
 				for add in "${ADDS[@]}"; do
-					docker-machine scp -r "${add}" ${node}:${dir}
+					docker-machine scp -r "${add}" ${node}:${dir} 1>/dev/null
 				done
 				docker-machine ssh $node sudo docker build -t ${TAG} ${dir}
 			fi
