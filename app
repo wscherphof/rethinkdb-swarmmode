@@ -12,17 +12,19 @@ usage ()
     echo "SWARM  swarm to create the service on"
     echo
     echo "Options:"
-    echo "  -n network    swarm overlay network the service connects to (default: dbnet)"
-    echo "  -p port ...   ports to publish (without creating an ssh tunnel)"
-    echo "  -t port ...   ports to publish (and create an ssh tunnel to)"
-    echo "  -r replicas   number of replicas to run (default: 1)"
+    echo "  -e key=value ...  environment variables"
+    echo "  -n network        swarm overlay network the service connects to (default: dbnet)"
+    echo "  -p port ...       ports to publish (without creating an ssh tunnel)"
+    echo "  -t port ...       ports to publish (and create an ssh tunnel to)"
+    echo "  -r replicas       number of replicas to run (default: 1)"
     echo
     echo "A volume appdata is mounted on /appdata"
     echo
 }
 
-while getopts "n:p:t:r:h" opt; do
+while getopts "e:n:p:t:r:h" opt; do
     case $opt in
+        e  ) ENVS+=("$OPTARG");;
         n  ) NETWORK="$OPTARG";;
         p  ) PORTS+=("$OPTARG");;
         t  ) TUNNELS+=("$OPTARG");;
@@ -37,15 +39,15 @@ shift $((OPTIND -1))
 
 NAME="$1"
 TAG="$2"
-ENV="$3"
-if [ ! "$TAG" -o ! "$NAME" -o ! "$ENV" ]; then
+SWARM="$3"
+if [ ! "$TAG" -o ! "$NAME" -o ! "$SWARM" ]; then
     usage
     exit 1
 fi
 REPLICAS=${REPLICAS-1}
 NETWORK=${NETWORK-dbnet}
 
-DOCKER="docker-machine ssh ${ENV}-manager-1 sudo docker"
+DOCKER="docker-machine ssh ${SWARM}-manager-1 sudo docker"
 
 echo "* creating appdata..."
 ${DOCKER} volume create --name appdata
@@ -53,6 +55,9 @@ ${DOCKER} volume create --name appdata
 echo "* starting service..."
 ${DOCKER} service ps $NAME &>/dev/null
 if [ "$?" = "0" ]; then
+    for env in "${ENVS[@]}"; do
+        ${DOCKER} service update --env-add ${env} ${NAME}
+    done
 	${DOCKER} service update --image ${TAG} ${NAME}
 	${DOCKER} service scale ${NAME}=${REPLICAS}
 else
@@ -63,13 +68,17 @@ else
     for port in "${TUNNELS[@]}"; do
         PUBLISH="${PUBLISH} --publish ${port}:${port}"
     done
-	${DOCKER} service create --name ${NAME} --replicas ${REPLICAS} --mount src=appdata,dst=/appdata --network ${NETWORK} ${PUBLISH} ${TAG}
+    ENVIRONMENT=""
+    for env in "${ENVS[@]}"; do
+        ENVIRONMENT="${ENVIRONMENT} -e ${env}"
+    done
+	${DOCKER} service create --name ${NAME} --replicas ${REPLICAS} --mount src=appdata,dst=/appdata ${ENVIRONMENT} --network ${NETWORK} ${PUBLISH} ${TAG}
 fi
 
 if [ "${TUNNELS[@]}" ]; then
     echo "* connecting..."
     sleep 15
     for port in "${TUNNELS[@]}"; do
-        $(dirname "$0")/util/tunnel $ENV $port
+        $(dirname "$0")/util/tunnel $SWARM $port
     done
 fi
