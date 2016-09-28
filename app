@@ -52,13 +52,15 @@ DOCKER="docker-machine ssh ${SWARM}-manager-1 sudo docker"
 echo "* creating appdata..."
 ${DOCKER} volume create --name appdata
 
-echo "* starting service..."
 ${DOCKER} service ps $NAME &>/dev/null
 if [ "$?" = "0" ]; then
     for env in "${ENVS[@]}"; do
+        echo "* setting env ${env}..."
         ${DOCKER} service update --env-add ${env} ${NAME}
     done
+    echo "* updating image to ${TAG}..."
 	${DOCKER} service update --image ${TAG} ${NAME}
+    echo "* scaling..."
 	${DOCKER} service scale ${NAME}=${REPLICAS}
 else
 	PUBLISH=""
@@ -72,7 +74,8 @@ else
     for env in "${ENVS[@]}"; do
         ENVIRONMENT="${ENVIRONMENT} -e ${env}"
     done
-	${DOCKER} service create --name ${NAME} --replicas ${REPLICAS} --mount src=appdata,dst=/appdata ${ENVIRONMENT} --network ${NETWORK} ${PUBLISH} ${TAG}
+    echo "* starting service..."
+	${DOCKER} service create --mount src=appdata,dst=/appdata --name ${NAME} --replicas ${REPLICAS} ${ENVIRONMENT} --network ${NETWORK} ${PUBLISH} ${TAG}
 fi
 
 if [ "${TUNNELS[@]}" ]; then
