@@ -12,14 +12,16 @@ usage ()
 	echo "SWARM      swarm on which nodes to build the image (instead of building locally, then pushing to reporitory)"
 	echo
 	echo "Options:"
-	echo "  -p port ...  ports for the image to EXPOSE"
-	echo "  -a file ...  files to ADD to the image's / folder (path relative to SOURCEDIR)"
-	echo "  -A treeish   git branch/tag of the complete SOURCEDIR to ADD to the image's / folder"
+	echo "  -e key=value ...  ENV variables for the image"
+	echo "  -p port ...       ports for the image to EXPOSE"
+	echo "  -a file ...       files or directories to ADD to the image's / folder (path relative to SOURCEDIR)"
+	echo "  -A treeish        git branch/tag of the complete SOURCEDIR to ADD to the image's / folder"
 	echo
 }
 
-while getopts "p:a:A:h" opt; do
+while getopts "e:p:a:A:h" opt; do
     case $opt in
+        e  ) ENVS+=("$OPTARG");;
         p  ) PORTS+=("$OPTARG");;
         a  ) ADDS+=("$OPTARG");;
         A  ) TREEISH="$OPTARG";;
@@ -31,6 +33,10 @@ while getopts "p:a:A:h" opt; do
 done
 shift $((OPTIND -1))
 
+SOURCEDIR="$1"
+TAG="$2"
+SWARM="$3"
+
 continue ()
 {
 	if [ "$?" != "0" ]; then
@@ -38,7 +44,7 @@ continue ()
 	fi
 }
 
-pushd "$1" 1>/dev/null
+pushd "$SOURCEDIR" 1>/dev/null
 continue
 
 echo "* formatting source code..."
@@ -54,27 +60,32 @@ BINARY="$(pwd | awk -F "/" '{print $NF}')" # go build names the binary after the
 
 echo "FROM scratch" > ./Dockerfile
 echo "ADD ${BINARY} /" >> ./Dockerfile
-echo "EXPOSE ${PORTS[@]}" >> ./Dockerfile
 echo "ENTRYPOINT [\"/${BINARY}\"]" >> ./Dockerfile
+
+if [ "${ENVS}" ]; then
+	echo "ENV ${ENVS[@]}" >> ./Dockerfile
+fi
+
+if [ "${PORTS}" ]; then
+	echo "EXPOSE ${PORTS[@]}" >> ./Dockerfile
+fi
 
 if [ "${TREEISH}" ]; then
 	echo "ADD archive.tar.gz /" >> ./Dockerfile
 	git archive --format tar.gz -o archive.tar.gz ${TREEISH} .
 fi
 
-TAG="$2"
-ENV="$3"
-if [ "${ENV}" ]; then
+if [ "${SWARM}" ]; then
 	# Build on all nodes, skipping the push to the repository.
 	# Dirty, but quick.
 	for add in "${ADDS[@]}"; do
-		echo "ADD \"$(basename ${add})\"" \"/\" >> ./Dockerfile
+		echo "ADD \"$(basename ${add})\"" \"/$(basename ${add})\" >> ./Dockerfile
 	done
 	for type in worker manager
 	do
 		for (( i=1; ; i++ ))
 		do
-			node="${ENV}-${type}-${i}"
+			node="${SWARM}-${type}-${i}"
 			status=$(docker-machine status $node 2>/dev/null)
 			if [ "$?" != "0" ]; then
 				break
@@ -82,16 +93,17 @@ if [ "${ENV}" ]; then
 				echo "* WARNING: $node is not running"
 			else
 				echo "* building image on $node..."
-				dir="$(docker-machine ssh $node pwd)"
+				docker-machine ssh $node mkdir -p ${BINARY}
+				dir="$(docker-machine ssh $node pwd)/${BINARY}"
 				if [ "${TREEISH}" ]; then
 					docker-machine scp ./archive.tar.gz ${node}:${dir}
 				fi
 				docker-machine scp ./${BINARY} ${node}:${dir}
 				docker-machine scp ./Dockerfile ${node}:${dir}
 				for add in "${ADDS[@]}"; do
-					docker-machine scp "${add}" ${node}:${dir}
+					docker-machine scp -r "${add}" ${node}:${dir}
 				done
-				docker-machine ssh $node sudo docker build -t ${TAG} .
+				docker-machine ssh $node sudo docker build -t ${TAG} ${dir}
 			fi
 		done
 	done
@@ -99,13 +111,13 @@ else
 	# Build locally and use the repository for shipping the image to the nodes.
 	# Pretty, but slow.
 	for add in "${ADDS[@]}"; do
-		echo "ADD \"${add}\" \"/\"" >> ./Dockerfile
+		echo "ADD \"${add}\" \"/$(basename ${add})\"" >> ./Dockerfile
 	done
 	echo "* building image..."
 	docker build -t ${TAG} .
 	echo "* pushing image..."
 	docker push ${TAG}
 fi
-rm ./${BINARY} ./Dockerfile ./archive.tar.gz
+rm ./${BINARY} ./Dockerfile ./archive.tar.gz 2>/dev/null
 
 popd 1>/dev/null
