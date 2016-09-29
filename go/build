@@ -93,7 +93,7 @@ if [ "${SWARM}" ]; then
 				echo "* WARNING: $node is not running"
 			else
 				echo "* building image on $node..."
-				docker-machine ssh $node mkdir -p ${BINARY}
+				docker-machine ssh $node mkdir ${BINARY}
 				dir="$(docker-machine ssh $node pwd)/${BINARY}"
 				if [ "${TREEISH}" ]; then
 					docker-machine scp ./archive.tar.gz ${node}:${dir} 1>/dev/null
@@ -104,6 +104,7 @@ if [ "${SWARM}" ]; then
 					docker-machine scp -r "${add}" ${node}:${dir} 1>/dev/null
 				done
 				docker-machine ssh $node sudo docker build -t ${TAG} ${dir}
+				docker-machine ssh $node rm -rf ${BINARY}
 			fi
 		done
 	done
