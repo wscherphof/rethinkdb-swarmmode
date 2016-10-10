@@ -44,12 +44,22 @@ succeed ()
 	fi
 }
 
+go get github.com/kardianos/govendor
+succeed
+
 pushd "$SOURCEDIR" 1>/dev/null
 succeed
 
-echo "* formatting source code..."
-go get github.com/kardianos/govendor
+echo "* updating dependencies..."
+govendor update +external +vendor
+succeed
+
+echo "* formatting..."
 govendor fmt +local +external
+succeed
+
+echo "* vetting..."
+govendor vet +local +external
 succeed
 
 echo "* compiling..."
